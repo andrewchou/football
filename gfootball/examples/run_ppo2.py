@@ -26,7 +26,7 @@ from baselines.bench import monitor
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from baselines.ppo2 import ppo2
 import gfootball.env as football_env
-from gfootball.examples import models  
+from gfootball.examples import models
 
 
 FLAGS = flags.FLAGS
@@ -93,11 +93,13 @@ def train(_):
   # we could be using TF as part of environment if one of the players is
   # controled by an already trained model.
   import tensorflow.compat.v1 as tf
+
   ncpu = multiprocessing.cpu_count()
   config = tf.ConfigProto(allow_soft_placement=True,
                           intra_op_parallelism_threads=ncpu,
                           inter_op_parallelism_threads=ncpu)
   config.gpu_options.allow_growth = True
+  print('Logging to:', logger.get_dir())
   tf.Session(config=config).__enter__()
 
   ppo2.learn(network=FLAGS.policy,
@@ -115,6 +117,7 @@ def train(_):
              save_interval=FLAGS.save_interval,
              cliprange=FLAGS.cliprange,
              load_path=FLAGS.load_path)
+  print('Logged to:', logger.get_dir())
 
 
 if __name__ == '__main__':
