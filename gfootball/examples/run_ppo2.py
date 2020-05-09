@@ -39,6 +39,9 @@ flags.DEFINE_enum('state', 'extracted_stacked', ['extracted',
 flags.DEFINE_enum('reward_experiment', 'scoring',
                   ['scoring', 'scoring,checkpoints'],
                   'Reward to be used for training.')
+flags.DEFINE_enum('representation', 'extracted',
+                  ['pixels', 'pixels_gray', 'extracted', 'simple115', 'simple115v2'],
+                  'Reward to be used for training.')
 flags.DEFINE_enum('policy', 'cnn', ['cnn', 'lstm', 'mlp', 'impala_cnn',
                                     'gfootball_impala_cnn'],
                   'Policy architecture')
@@ -71,6 +74,7 @@ def create_single_football_env(iprocess):
   """Creates gfootball environment."""
   env = football_env.create_environment(
       env_name=FLAGS.level, stacked=('stacked' in FLAGS.state),
+      representation=FLAGS.representation,
       rewards=FLAGS.reward_experiment,
       logdir=logger.get_dir(),
       write_goal_dumps=FLAGS.dump_scores and (iprocess == 0),
