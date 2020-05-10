@@ -597,6 +597,8 @@ void HumanController::_GetHidInput(Vector3 &rawInputDirection,
                                    float &rawInputVelocityFloat) {
   DO_VALIDATION;
   rawInputDirection = hid->GetDirection();
+  float pitchHalfW = match->getPitchHalfW();
+  float pitchHalfH = match->getPitchHalfH();
   if (CastPlayer()->GetPosition().coords[0] > pitchHalfW) {
     DO_VALIDATION;
     rawInputDirection.coords[0] = std::min(0.0f, rawInputDirection.coords[0]);

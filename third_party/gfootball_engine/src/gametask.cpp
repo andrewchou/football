@@ -32,13 +32,13 @@ GameTask::~GameTask() {
   StopMatch();
 }
 
-void GameTask::StartMatch(bool animations) {
+void GameTask::StartMatch(bool animations, float pitch_scale) {
   DO_VALIDATION;
   randomize(GetScenarioConfig().game_engine_random_seed);
   MatchData *matchData = GetMenuTask()->GetMatchData();
   assert(matchData);
   assert(!match);
-  match.reset(new Match(matchData, GetControllers(), animations));
+  match.reset(new Match(matchData, GetControllers(), animations, pitch_scale));
 }
 
 bool GameTask::StopMatch() {

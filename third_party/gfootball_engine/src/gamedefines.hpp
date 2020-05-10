@@ -240,8 +240,9 @@ typedef std::vector<PlayerCommand> PlayerCommandQueue;
 
 e_PlayerRole GetRoleFromString(const std::string &roleString);
 
-const float pitchHalfW = 55; // only inside side- and backlines
-const float pitchHalfH = 36;
+// All measurements are in meters, not yards :(
+const float PITCH_HALF_W = 55; // only inside side- and backlines
+const float PITCH_HALF_H = 36;
 const float pitchFullHalfW = 60; // including 'rim'
 const float pitchFullHalfH = 40;
 const float lineHalfW = 0.06f;
@@ -249,6 +250,10 @@ const float lineHalfW = 0.06f;
 const float goalDepth = 2.55f;
 const float goalHeight = 2.5f;
 const float goalHalfWidth = 3.7f;
+
+// These are slightly wrong from 18 yards, but that's how things were coded originally so I'm leaving it for now.
+const float PENALTY_BOX_HEIGHT = 16.4f;
+const float PENALTY_BOX_WIDTH = 20.05f;
 
 const float FORMATION_Y_SCALE = -2.36f;
 

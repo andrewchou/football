@@ -31,3 +31,8 @@ int IController::GetReactionTime_ms() {
   DO_VALIDATION;
   return int(std::round(80.0f - player->GetStat(physical_reaction) * 40.0f));
 }
+
+float IController::getPitchHalfW() {return match->getPitchHalfW(); }
+float IController::getPitchHalfH() {return match->getPitchHalfH(); }
+float IController::getPenaltyBoxHeight() {return match->getPenaltyBoxHeight(); }
+float IController::getPenaltyBoxWidth() {return match->getPenaltyBoxWidth(); }

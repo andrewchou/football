@@ -30,7 +30,7 @@ class GameTask {
     GameTask();
     ~GameTask();
 
-    void StartMatch(bool init_animation);
+    void StartMatch(bool init_animation, float pitch_scale);
     bool StopMatch();
 
     void ProcessPhase();

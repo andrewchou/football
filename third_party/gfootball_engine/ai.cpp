@@ -183,7 +183,8 @@ BOOST_PYTHON_MODULE(_gameplayfootball) {
                      &ScenarioConfig::end_episode_on_possession_change)
       .def_readwrite("end_episode_on_out_of_play",
                      &ScenarioConfig::end_episode_on_out_of_play)
-      .def_readwrite("game_duration", &ScenarioConfig::game_duration);
+      .def_readwrite("game_duration", &ScenarioConfig::game_duration)
+      .def_readwrite("pitch_scale", &ScenarioConfig::pitch_scale);
 
   class_<std::vector<FormationEntry> >("FormationEntryVec").def(
       vector_indexing_suite<std::vector<FormationEntry> >());

@@ -655,3 +655,9 @@ void Team::ProcessState(EnvState *state) {
   state->process(switchPriority);
   state->process(lastTouchPlayer);
 }
+
+
+float Team::getPitchHalfW() {return match->getPitchHalfW(); }
+float Team::getPitchHalfH() {return match->getPitchHalfH(); }
+float Team::getPenaltyBoxHeight() {return match->getPenaltyBoxHeight(); }
+float Team::getPenaltyBoxWidth() {return match->getPenaltyBoxWidth(); }

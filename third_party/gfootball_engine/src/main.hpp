@@ -118,6 +118,7 @@ struct ScenarioConfig {
   bool end_episode_on_possession_change = false;
   bool end_episode_on_out_of_play = false;
   int game_duration = 3000;
+  float pitch_scale = 1.0;
   friend GameEnv;
 
   bool LeftTeamOwnsBall() { DO_VALIDATION;
@@ -152,6 +153,7 @@ struct ScenarioConfig {
     state->process(end_episode_on_possession_change);
     state->process(end_episode_on_out_of_play);
     state->process(game_duration);
+    state->process(pitch_scale);
   }
 
   void ProcessState(EnvState* state) {

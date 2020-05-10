@@ -85,9 +85,11 @@ class Scenario(object):
       if 'reverse_team_processing' not in self._config:
         self._config['reverse_team_processing'] = (
             bool(self._config['game_engine_random_seed'] % 2))
+    # assert 0, (self._scenario_cfg.reverse_team_processing, self._scenario_cfg.pitch_scale)
     if 'reverse_team_processing' in self._config:
       self._scenario_cfg.reverse_team_processing = (
           self._config['reverse_team_processing'])
+    self._scenario_cfg.pitch_scale = self._config['pitch_scale']
 
   def config(self):
     return self._scenario_cfg

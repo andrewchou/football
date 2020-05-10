@@ -122,6 +122,9 @@ class Player : public PlayerBase {
     virtual void ResetSituation(const Vector3 &focusPos);
 
     void ProcessState(EnvState* state);
+
+    float getPitchHalfW();
+    float getPitchHalfH();
   protected:
     void _CalculateTacticalSituation();
 

@@ -52,7 +52,7 @@ struct PlayerBounce {
 class Match {
 
   public:
-    Match(MatchData *matchData, const std::vector<IHIDevice*> &controllers, bool init_animation);
+    Match(MatchData *matchData, const std::vector<IHIDevice*> &controllers, bool init_animation, float pitch_scale_);
     virtual ~Match();
 
     void Exit();
@@ -156,6 +156,11 @@ class Match {
     int SecondTeam() { DO_VALIDATION; return second_team; }
     bool isBallMirrored() { DO_VALIDATION; return ball_mirrored; }
 
+    float getPitchHalfW() {return PITCH_HALF_W * pitch_scale; }
+    float getPitchHalfH() {return PITCH_HALF_H * pitch_scale; }
+    float getPenaltyBoxHeight() {return PENALTY_BOX_HEIGHT * pitch_scale; }
+    float getPenaltyBoxWidth() {return PENALTY_BOX_WIDTH * pitch_scale; }
+
   private:
     bool CheckForGoal(signed int side, const Vector3& previousBallPos);
 
@@ -172,6 +177,7 @@ class Match {
     int first_team = 0;
     int second_team = 1;
     bool ball_mirrored = false;
+    float pitch_scale = 0.0;
 
     Officials *officials;
 

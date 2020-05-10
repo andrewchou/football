@@ -27,6 +27,9 @@ void GoalieDefaultStrategy::RequestInput(ElizaController *controller,
                                          Vector3 &direction, float &velocity) {
   DO_VALIDATION;
 
+  float pitchHalfW = controller->getPitchHalfW();
+  float pitchHalfH = controller->getPitchHalfH();
+
   // base position
   float lineDistance = 10.0f; // default distance keeper stays in front of goal line
   Vector3 ballPos = mentalImage->GetBallPrediction(600 + static_cast<Player*>(controller->GetPlayer())->GetTimeNeededToGetToBall_ms() * 0.2f).Get2D();
@@ -237,6 +240,8 @@ void GoalieDefaultStrategy::RequestInput(ElizaController *controller,
 void GoalieDefaultStrategy::CalculateIfBallIsBoundForGoal(
     ElizaController *controller, const MentalImage *mentalImage) {
   DO_VALIDATION;
+  float pitchHalfW = controller->getPitchHalfW();
+  float pitchHalfH = controller->getPitchHalfH();
 
   ballBoundForGoal = false;
   bool intersect = false;
@@ -277,6 +282,8 @@ void GoalieDefaultStrategy::CalculateIfBallIsBoundForGoal(
     */
 
     // 2d version
+    float pitchHalfW = controller->getPitchHalfW();
+    float pitchHalfH = controller->getPitchHalfH();
 
     Line ballToGoal;
     ballToGoal.SetVertex(0, mentalImage->GetBallPrediction(0).Get2D());

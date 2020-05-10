@@ -39,6 +39,8 @@ Vector3 AI_GetAdaptedFormationPosition(
     float microFocusStrength, float midfieldFocus, float midfieldFocusStrength,
     bool useDynamicFormationPosition) {
   DO_VALIDATION;
+  float pitchHalfW = match->getPitchHalfW();
+  float pitchHalfH = match->getPitchHalfH();
   Team *team = player->GetTeam();
   int side = team->GetDynamicSide();
 
@@ -193,6 +195,8 @@ float AI_CalculateFreeSpace(Match *match, const MentalImage *mentalImage,
 float AI_GetOffsideLine(Match *match, const MentalImage *mentalImage,
                         int teamID, unsigned int futureSim_ms) {
   DO_VALIDATION;
+  float pitchHalfW = match->getPitchHalfW();
+  float pitchHalfH = match->getPitchHalfH();
   signed int side = match->GetTeam(teamID)->GetDynamicSide();
 
   auto opponentPlayerImages = mentalImage->GetTeamPlayerImages(teamID);
@@ -241,6 +245,8 @@ void AI_GetBestDribbleMovement(Match *match, PlayerBase *p,
                                float &desiredVelocity,
                                const TeamTactics &teamTactics) {
   DO_VALIDATION;
+  float pitchHalfW = match->getPitchHalfW();
+  float pitchHalfH = match->getPitchHalfH();
 
   Player* player = static_cast<Player*>(p);
   Vector3 myPos = player->GetPosition();
@@ -526,6 +532,8 @@ unsigned int AI_GetToBallMovement(Match *match, const MentalImage *mentalImage,
                                   float &bestVelocityFloat, Vector3 &bestLookAt,
                                   float haste) {
   DO_VALIDATION;
+  float pitchHalfW = match->getPitchHalfW();
+  float pitchHalfH = match->getPitchHalfH();
 
   Vector3 playerPos = player->GetPosition();
 
@@ -932,6 +940,8 @@ void AI_GetClosestPlayers(Team *team, const Vector3 &position,
 Player *AI_GetBestSwitchTargetPlayer(Match *match, Team *team,
                                      const Vector3 &desiredMovement) {
   DO_VALIDATION;
+  float pitchHalfW = match->getPitchHalfW();
+  float pitchHalfH = match->getPitchHalfH();
 
   // find most interesting position on pitch
 
@@ -1176,6 +1186,8 @@ void AI_GetPass(Player *player, e_FunctionType passType,
 Vector3 AI_GetShotDirection(Player *player, const Vector3 &inputDirection,
                             float autoDirectionBias) {
   DO_VALIDATION;
+  float pitchHalfW = player->getPitchHalfW();
+  float pitchHalfH = player->getPitchHalfH();
 
   Vector3 manualDirection = inputDirection;
 

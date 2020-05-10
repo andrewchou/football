@@ -84,6 +84,8 @@ float PlayerController::GetLastSwitchBias() {
 void PlayerController::AddDefensiveComponent(Vector3 &desiredPosition,
                                              float bias, Player *forcedOpp) {
   DO_VALIDATION;
+  float pitchHalfW = getPitchHalfW();
+  float pitchHalfH = getPitchHalfH();
 
   Player* opponent = 0;
   if (!forcedOpp) opponent = CastPlayer()->GetManMarking(); else
@@ -161,6 +163,8 @@ void PlayerController::AddDefensiveComponent(Vector3 &desiredPosition,
 
 Vector3 PlayerController::GetDefendPosition(Player *opp, float distance) {
   DO_VALIDATION;
+  float pitchHalfW = getPitchHalfW();
+  float pitchHalfH = getPitchHalfH();
 
   PlayerImage oppImage = match->GetMentalImage(_mentalImageTime)->GetPlayerImage(opp);
 
@@ -299,6 +303,8 @@ void PlayerController::_Preprocess() {
 void PlayerController::_KeeperDeflectCommand(PlayerCommandQueue &commandQueue,
                                              bool onlyPickupAnims) {
   DO_VALIDATION;
+  float pitchHalfW = getPitchHalfW();
+  float pitchHalfH = getPitchHalfH();
 
   if (CastPlayer()->GetFormationEntry().role != e_PlayerRole_GK) return;
   if (match->GetBall()->Predict(400).GetDistance(player->GetPosition()) > ballDistanceOptimizeThreshold + 10.0f) return;
@@ -308,10 +314,10 @@ void PlayerController::_KeeperDeflectCommand(PlayerCommandQueue &commandQueue,
 
   if (match->GetBallRetainer() != 0) return;
 
-  // can't use hands outside of keeper's 16 yard box (todo: make precise, probably in humanoid.cpp's getbestcheatableanim)
-  if (fabs(match->GetBall()->Predict(160).coords[1]) > 20.05f) return;
+  // can't use hands outside of keeper's penalty box (todo: make precise, probably in humanoid.cpp's getbestcheatableanim)
+  if (fabs(match->GetBall()->Predict(160).coords[1]) > getPenaltyBoxWidth()) return;
   if (match->GetBall()->Predict(160).coords[0] * -team->GetDynamicSide() >
-      -pitchHalfW + 16.4)
+      -pitchHalfW + getPenaltyBoxHeight())
     return;
 
   PlayerCommand command;
@@ -533,6 +539,8 @@ void PlayerController::_MovementCommand(PlayerCommandQueue &commandQueue,
   DO_VALIDATION;
   auto _mentalImage = match->GetMentalImage(_mentalImageTime);
   int defaultLookAtTime_ms = 40;
+  float pitchHalfW = getPitchHalfW();
+  float pitchHalfH = getPitchHalfH();
 
   Vector3 quantizedInputDirection = inputDirection;
   if (quantizeDirection) QuantizeDirection(quantizedInputDirection, GetQuantizedDirectionBias());

@@ -134,6 +134,8 @@ void Ball::SetRotation(real x, real y, real z, float bias) {
 
 BallSpatialInfo Ball::CalculatePrediction() {
   DO_VALIDATION;
+  float pitchHalfW = match->getPitchHalfW();
+  float pitchHalfH = match->getPitchHalfH();
 
   Vector3 newMomentum;
   Quaternion newRotation_ms;
@@ -254,7 +256,6 @@ BallSpatialInfo Ball::CalculatePrediction() {
 
 
       // posts
-
       if (nextPos.coords[2] < goalHeight + ballRadius + postRadius &&
           (nextPos.Get2D().GetAbsolute() -
            Vector3(pitchHalfW, goalHalfWidth, 0))

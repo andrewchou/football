@@ -115,8 +115,12 @@ void GameEnv::start_game() {
   }
   config->Set("game", 0);
   run_game(config, game_config.render);
-  auto scenario_config = ScenarioConfig::make();
-  reset(*scenario_config, false);
+// TODO chou: not sure if it's ok to remove this in all cases,
+// but if it's called then it causes the 3D models/nodes to be initialized
+// to the default pitch scale and then it doesn't update to the right pitch scale
+// when `reset()` is called.
+//  auto scenario_config = ScenarioConfig::make();
+//  reset(*scenario_config, false);
   DO_VALIDATION;
 }
 
@@ -388,5 +392,6 @@ void GameEnv::reset(ScenarioConfig& game_config, bool animations) {
     context->graphicsSystem.GetTask()->Render(true);
     GetTracker()->setDisabled(false);
   }
-  GetGameTask()->StartMatch(animations);
+//  assert(game_config.pitch_scale == 0.5);
+  GetGameTask()->StartMatch(animations, game_config.pitch_scale);
 }

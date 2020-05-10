@@ -123,6 +123,11 @@ class Team {
 
     Player *GetGoalie();
 
+    float getPitchHalfW();
+    float getPitchHalfH();
+    float getPenaltyBoxHeight();
+    float getPenaltyBoxWidth();
+
   protected:
     const int id;
     Match *match;

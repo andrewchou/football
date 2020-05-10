@@ -112,6 +112,8 @@ void Gui2Radar::Put() {
   DO_VALIDATION;
 
   Vector3 position = match->GetBall()->Predict(0).Get2D();
+  float pitchHalfW = match->getPitchHalfW();
+  float pitchHalfH = match->getPitchHalfH();
   Vector3 pos2d =
       position * Vector3(1 / (pitchHalfW * 2), -(1 / (pitchHalfH * 2)), 0);
   pos2d = pos2d + Vector3(0.5, 0.5, 0);

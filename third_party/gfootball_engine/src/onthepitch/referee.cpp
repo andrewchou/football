@@ -92,6 +92,8 @@ Referee::~Referee() { DO_VALIDATION; }
 
 void Referee::Process() {
   DO_VALIDATION;
+  float pitchHalfW = match->getPitchHalfW();
+  float pitchHalfH = match->getPitchHalfH();
   if (match->IsInPlay() && !match->IsInSetPiece()) {
     DO_VALIDATION;
 
@@ -432,6 +434,8 @@ void Referee::ProcessState(EnvState *state) {
 
 bool Referee::CheckFoul() {
   DO_VALIDATION;
+  float pitchHalfW = match->getPitchHalfW();
+  float pitchHalfH = match->getPitchHalfH();
 
   bool penalty = false;
   if (foul.foulType != 0) {

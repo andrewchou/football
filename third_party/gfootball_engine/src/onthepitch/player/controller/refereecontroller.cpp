@@ -75,6 +75,8 @@ void RefereeController::GetForceField(std::vector<ForceSpot> &forceField) {
 
 void RefereeController::RequestCommand(PlayerCommandQueue &commandQueue) {
   DO_VALIDATION;
+  float pitchHalfW = match->getPitchHalfW();
+  float pitchHalfH = match->getPitchHalfH();
 
   switch (CastPlayer()->GetOfficialType()) {
     DO_VALIDATION;

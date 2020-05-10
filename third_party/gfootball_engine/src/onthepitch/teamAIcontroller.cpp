@@ -100,6 +100,8 @@ Player *SelectAttackingRunPlayer(Team *team) {
 
 void TeamAIController::Process() {
   DO_VALIDATION;
+  float pitchHalfW = team->getPitchHalfW();
+  float pitchHalfH = team->getPitchHalfH();
 
   if (match->GetActualTime_ms() % 1000 == 0) UpdateTactics();
 
@@ -321,6 +323,8 @@ float mixup(float base, const std::string &varname, e_PlayerRole role) {
 Vector3 TeamAIController::GetAdaptedFormationPosition(
     Player *player, bool useDynamicFormationPosition) {
   DO_VALIDATION;
+  float pitchHalfW = team->getPitchHalfW();
+  float pitchHalfH = team->getPitchHalfH();
 
   bool toggle_yFocus = true;
   bool toggle_microFocus = true;
@@ -590,6 +594,8 @@ void TeamAIController::CalculateDynamicRoles() {
 float TeamAIController::CalculateMarkingQuality(Player *player, Player *opp) {
   DO_VALIDATION;
 
+  float pitchHalfW = team->getPitchHalfW();
+  float pitchHalfH = team->getPitchHalfH();
 
 
   Vector3 oppPosition = opp->GetPosition() + opp->GetMovement() * 0.1f;
@@ -732,6 +738,8 @@ void TeamAIController::PrepareSetPiece(e_GameMode setPiece, Team *other_team,
                                        int kickoffTakerTeamId,
                                        int takerTeamID) {
   DO_VALIDATION;
+  float pitchHalfW = team->getPitchHalfW();
+  float pitchHalfH = team->getPitchHalfH();
   setPieceType = setPiece;
 
   if (takerTeamID == -1) assert(setPieceType == e_GameMode_Normal);

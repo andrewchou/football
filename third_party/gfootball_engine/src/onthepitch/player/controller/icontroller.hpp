@@ -46,6 +46,11 @@ class IController {
 
     virtual void Reset() = 0;
 
+    float getPitchHalfW();
+    float getPitchHalfH();
+    float getPenaltyBoxHeight();
+    float getPenaltyBoxWidth();
+
   protected:
     PlayerBase *player = 0;
     Match *match;

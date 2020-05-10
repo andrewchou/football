@@ -723,24 +723,27 @@ void Humanoid::Process() {
                                        currentAnim.rotationSmuggle.end   * endFrameBias;
 
 
+  float pitchHalfW = team->getPitchHalfW();
+  float pitchHalfH = team->getPitchHalfH();
+
   // ballretainer should not get out of 16 meter box
 
   if (match->GetBallRetainer() == player &&
       CastPlayer()->GetFormationEntry().role == e_PlayerRole_GK &&
       (match->IsInSetPiece() == false && match->IsInPlay() == true)) {
     DO_VALIDATION;
-    if (match->GetBall()->Predict(0).coords[1] > 20.05f) {
+    if (match->GetBall()->Predict(0).coords[1] > team->getPenaltyBoxWidth()) {
       DO_VALIDATION;
-      OffsetPosition(Vector3(0, clamp(20.05f - match->GetBall()->Predict(0).coords[1], -0.5f, 0.5f), 0) * 0.3f);
+      OffsetPosition(Vector3(0, clamp(team->getPenaltyBoxWidth() - match->GetBall()->Predict(0).coords[1], -0.5f, 0.5f), 0) * 0.3f);
     }
-    if (match->GetBall()->Predict(0).coords[1] < -20.05f) {
+    if (match->GetBall()->Predict(0).coords[1] < -team->getPenaltyBoxWidth()) {
       DO_VALIDATION;
-      OffsetPosition(Vector3(0, clamp(-20.05f - match->GetBall()->Predict(0).coords[1], -0.5f, 0.5f), 0) * 0.3f);
+      OffsetPosition(Vector3(0, clamp(-team->getPenaltyBoxWidth() - match->GetBall()->Predict(0).coords[1], -0.5f, 0.5f), 0) * 0.3f);
     }
     if (match->GetBall()->Predict(0).coords[0] * -team->GetDynamicSide() >
-        -pitchHalfW + 16.4f) {
+        -pitchHalfW + team->getPenaltyBoxHeight()) {
       DO_VALIDATION;
-      OffsetPosition(Vector3(clamp((-pitchHalfW + 16.4f) -
+      OffsetPosition(Vector3(clamp((-pitchHalfW + team->getPenaltyBoxHeight()) -
                                        match->GetBall()->Predict(0).coords[0] *
                                            -team->GetDynamicSide(),
                                    -0.5f, 0.5f),
@@ -1870,6 +1873,8 @@ signed int Humanoid::GetBestCheatableAnimID(const DataSet &sortedDataSet, bool u
       if (match->GetBallRetainer() != player) {
         DO_VALIDATION;
         Vector3 absBallPos = match->GetBall()->Predict(animTouchFrame * 10);
+        float pitchHalfW = team->getPitchHalfW();
+        float pitchHalfH = team->getPitchHalfH();
         if (fabs(absBallPos.coords[0]) > pitchHalfW + lineHalfW + 0.11f ||
             fabs(absBallPos.coords[1]) > pitchHalfH + lineHalfW + 0.11f) {
           DO_VALIDATION;

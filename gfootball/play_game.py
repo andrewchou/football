@@ -37,6 +37,7 @@ flags.DEFINE_enum('action_set', 'default', ['default', 'full'], 'Action set')
 flags.DEFINE_bool('real_time', True,
                   'If true, environment will slow down so humans can play.')
 flags.DEFINE_bool('render', True, 'Whether to do game rendering.')
+flags.DEFINE_float('pitch_scale', 1.0, 'Pitch scale. Can be 1.0 or 0.5 for now.')
 
 
 def main(_):
@@ -48,6 +49,7 @@ def main(_):
       'dump_full_episodes': True,
       'players': players,
       'real_time': FLAGS.real_time,
+      'pitch_scale': FLAGS.pitch_scale,
   })
   if FLAGS.level:
     cfg['level'] = FLAGS.level

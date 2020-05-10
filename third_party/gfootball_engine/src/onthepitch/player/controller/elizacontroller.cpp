@@ -63,6 +63,9 @@ void ElizaController::RequestCommand(PlayerCommandQueue &commandQueue) {
   bool manualMovement = false;
   bool extraHaste = false;
 
+  float pitchHalfW = match->getPitchHalfW();
+  float pitchHalfH = match->getPitchHalfH();
+
 
   // celebrate good times come on!
 
@@ -677,6 +680,8 @@ Vector3 ElizaController::GetSupportPosition_ForceField(
     spot.power *= 0.3f + 0.7f * NormalizedClamp((spot.origin - currentPos).GetLength(), 0.0f, 20.0f);
     forceField.push_back(spot);
   }
+  float pitchHalfW = match->getPitchHalfW();
+  float pitchHalfH = match->getPitchHalfH();
 
   if (adaptedMakeRun) {
     DO_VALIDATION;
@@ -937,6 +942,9 @@ void ElizaController::GetOnTheBallCommands(
     }  // !self
   }
 
+  float pitchHalfW = match->getPitchHalfW();
+  float pitchHalfH = match->getPitchHalfH();
+
   // panic
   float mindSet = AI_GetMindSet(CastPlayer()->GetDynamicFormationEntry().role);
   if (mindSet < 0.25f) {
@@ -1164,6 +1172,9 @@ void ElizaController::_AddCelebration(
   signed int xSide = (match->GetBall()->Predict(0).Get2D().coords[0] > 0) ? 1 : -1;
   signed int ySide = team->GetDynamicSide();
   if (team->GetLastTouchPlayer()) ySide = (team->GetLastTouchPlayer()->GetPosition().coords[1] > 0) ? 1 : -1;
+
+  float pitchHalfW = match->getPitchHalfW();
+  float pitchHalfH = match->getPitchHalfH();
   Vector3 celebrationPosition = Vector3(pitchHalfW * xSide, pitchHalfH * ySide, 0);
 
   Vector3 desiredDirection = (celebrationPosition - player->GetPosition()).GetNormalized();

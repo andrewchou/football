@@ -46,7 +46,7 @@ const std::vector<Vector3> &Match::GetAnimPositionCache(Animation *anim) const {
   return GetContext().animPositionCache.find(anim)->second;
 }
 
-Match::Match(MatchData *matchData, const std::vector<IHIDevice *> &controllers, bool animations)
+Match::Match(MatchData *matchData, const std::vector<IHIDevice *> &controllers, bool animations, float pitch_scale_)
     : matchData(matchData),
       first_team(GetScenarioConfig().reverse_team_processing ? 1 : 0),
       second_team(GetScenarioConfig().reverse_team_processing ? 0 : 1),
@@ -54,8 +54,10 @@ Match::Match(MatchData *matchData, const std::vector<IHIDevice *> &controllers, 
       possessionSideHistory(6000),
       matchDurationFactor(
           GetConfiguration()->GetReal("match_duration", 1.0) * 0.2f + 0.05f),
-      _useMagnet(GetScenarioConfig().use_magnet) {
+      _useMagnet(GetScenarioConfig().use_magnet),
+      pitch_scale(pitch_scale_) {
   DO_VALIDATION;
+  assert((pitch_scale == 1.0) || (pitch_scale == 0.5));
   auto& anims = GetContext().anims;
   GetContext().stablePlayerCount = 0;
 
@@ -199,7 +201,14 @@ Match::Match(MatchData *matchData, const std::vector<IHIDevice *> &controllers, 
 
   // goal netting
   if (!GetContext().goalsNode) {
-    GetContext().goalsNode = loader.LoadObject("media/objects/stadiums/goals.object");
+    assert((pitch_scale == 1.0) || (pitch_scale == 0.5));
+    if (pitch_scale == 1.0) {
+        assert(pitch_scale == 1.0);
+        GetContext().goalsNode = loader.LoadObject("media/objects/stadiums/goals.object");
+    } else {
+        assert(pitch_scale == 0.5);
+        GetContext().goalsNode = loader.LoadObject("media/objects/stadiums/goals_half.object");
+    }
     GetContext().goalsNode->SetLocalMode(e_LocalMode_Absolute);
   }
   GetScene3D()->AddNode(GetContext().goalsNode);
@@ -208,7 +217,7 @@ Match::Match(MatchData *matchData, const std::vector<IHIDevice *> &controllers, 
 
   // pitch
   if (GetGameConfig().render) {
-    GeneratePitch(2048, 1024, 1024, 512, 2048, 1024);
+    GeneratePitch(2048, 1024, 1024, 512, 2048, 1024, pitch_scale);
   }
 
   // sun
@@ -534,6 +543,8 @@ void Match::UpdateIngameCamera() {
               0, 0);
 
   ballPos.coords[2] *= 0.1f;
+  float pitchHalfW = getPitchHalfW();
+  float pitchHalfH = getPitchHalfH();
 
   float maxW = pitchHalfW * 0.84f * (1.0 / (zoom + 0.01f));// * (height * 0.75f + 0.25f);
   float maxH = pitchHalfH * 0.60f * (1.0 / (zoom + 0.01f)) * (height * 0.75f + 0.25f); // 0.52f
@@ -1115,6 +1126,8 @@ boost::intrusive_ptr<Node> Match::GetDynamicNode() {
 
 bool Match::CheckForGoal(signed int side, const Vector3 &previousBallPos) {
   DO_VALIDATION;
+  float pitchHalfW = getPitchHalfW();
+  float pitchHalfH = getPitchHalfH();
   if (fabs(ball->Predict(10).coords[0]) < pitchHalfW - 1.0) return false;
 
   Line line;
@@ -1736,6 +1749,8 @@ int Match::GetReplaySize_ms() {
 
 void Match::PrepareGoalNetting() {
   DO_VALIDATION;
+  float pitchHalfW = getPitchHalfW();
+  float pitchHalfH = getPitchHalfH();
 
   // collect vertices into nettingMeshes[0..1]
   std::vector < MaterializedTriangleMesh > &triangleMesh = boost::static_pointer_cast<Geometry>(GetContext().goalsNode->GetObject("goals"))->GetGeometryData()->GetResource()->GetTriangleMeshesRef();
@@ -1760,6 +1775,8 @@ void Match::PrepareGoalNetting() {
 
 void Match::UpdateGoalNetting(bool ballTouchesNet) {
   DO_VALIDATION;
+  float pitchHalfW = getPitchHalfW();
+  float pitchHalfH = getPitchHalfH();
 
   nettingHasChanged = false;
   int sideID = (ball->GetBallGeom()->GetPosition().coords[0] < 0) ? 0 : 1;

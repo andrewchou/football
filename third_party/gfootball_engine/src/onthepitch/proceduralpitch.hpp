@@ -24,6 +24,6 @@
 using namespace blunted;
 
 void GeneratePitch(int resX, int resY, int resSpecularX, int resSpecularY,
-                   int resNormalX, int resNormalY);
+                   int resNormalX, int resNormalY, float pitch_scale);
 
 #endif

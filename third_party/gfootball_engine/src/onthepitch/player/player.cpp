@@ -503,6 +503,8 @@ void Player::ResetSituation(const Vector3 &focusPos) {
 
 void Player::_CalculateTacticalSituation() {
   DO_VALIDATION;
+  float pitchHalfW = team->getPitchHalfW();
+  float pitchHalfH = team->getPitchHalfH();
   const MentalImage *mentalImage = static_cast<PlayerController*>(GetController())->GetMentalImage();
   assert(mentalImage);
   assert(IsActive());
@@ -530,3 +532,6 @@ void Player::_CalculateTacticalSituation() {
       std::pow(tacticalSituation.forwardRating,
                1.5f);  // more important when close to goal
 }
+
+float Player::getPitchHalfW() {return team->getPitchHalfW(); }
+float Player::getPitchHalfH() {return team->getPitchHalfH(); }
