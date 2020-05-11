@@ -89,6 +89,7 @@ class Scenario(object):
     if 'reverse_team_processing' in self._config:
       self._scenario_cfg.reverse_team_processing = (
           self._config['reverse_team_processing'])
+    assert hasattr(self._scenario_cfg, 'pitch_scale'), 'Need to build / install this version of gfootball_engine.'
     self._scenario_cfg.pitch_scale = self._config['pitch_scale']
 
   def config(self):

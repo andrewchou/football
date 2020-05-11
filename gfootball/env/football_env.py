@@ -21,6 +21,8 @@ from __future__ import print_function
 
 import copy
 import importlib
+from os.path import expanduser
+
 from absl import logging
 
 from gfootball.env import config as cfg
@@ -76,6 +78,8 @@ class FootballEnv(gym.Env):
         exit(1)
       player_config = copy.deepcopy(config)
       player_config.update(d)
+      if 'checkpoint' in player_config:
+        player_config['checkpoint'] = expanduser(player_config['checkpoint'])
       player = player_factory.Player(player_config, self._config)
       if name == 'agent':
         assert not self._agent, 'Only one \'agent\' player allowed'
