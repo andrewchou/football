@@ -98,6 +98,7 @@ def create_environment(env_name='',
     channel_dimensions=(
         observation_preprocessing.SMM_WIDTH,
         observation_preprocessing.SMM_HEIGHT),
+    pitch_scale=1.0,
     other_config_options={}):
     """Creates a Google Research Football environment.
 
@@ -168,6 +169,8 @@ def create_environment(env_name='',
           controls.
       channel_dimensions: (width, height) tuple that represents the dimensions of
          SMM or pixels representation.
+      pitch_scale: Float (1.0 or 0.5) specifying how big to make the pitch. Also
+          scales the penalty box, but not the goal.
       other_config_options: dict that allows directly setting other options in
          the Config
     Returns:
@@ -183,6 +186,7 @@ def create_environment(env_name='',
         'dump_full_episodes': write_full_episode_dumps,
         'dump_scores': write_goal_dumps,
         'players': players,
+        'pitch_scale': pitch_scale,
         'level': env_name,
         'tracesdir': logdir,
         'write_video': write_video,

@@ -68,6 +68,7 @@ flags.DEFINE_bool('dump_full_episodes', False,
 flags.DEFINE_bool('dump_scores', False,
                   'If True, sampled traces after scoring are dumped.')
 flags.DEFINE_string('load_path', None, 'Path to load initial checkpoint from.')
+flags.DEFINE_float('pitch_scale', 1.0, 'Pitch scale. Can be 1.0 or 0.5 for now.')
 
 
 def create_single_football_env(iprocess):
@@ -80,7 +81,9 @@ def create_single_football_env(iprocess):
       write_goal_dumps=FLAGS.dump_scores and (iprocess == 0),
       write_full_episode_dumps=FLAGS.dump_full_episodes and (iprocess == 0),
       render=FLAGS.render and (iprocess == 0),
-      dump_frequency=50 if FLAGS.render and iprocess == 0 else 0)
+      dump_frequency=50 if FLAGS.render and iprocess == 0 else 0,
+      pitch_scale=FLAGS.pitch_scale,
+  )
   env = monitor.Monitor(env, logger.get_dir() and os.path.join(logger.get_dir(),
                                                                str(iprocess)))
   return env
