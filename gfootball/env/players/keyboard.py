@@ -18,9 +18,8 @@
 import pygame
 
 from gfootball.env import controller_base
-from gfootball.env import football_action_set
 from gfootball.env import event_queue
-
+from gfootball.env import football_action_set
 
 KEY_TO_ACTIONS = {
     pygame.K_s: [football_action_set.action_short_pass,

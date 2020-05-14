@@ -263,6 +263,11 @@ class CheckpointRewardWrapper(gym.RewardWrapper):
 
   def reward(self, reward):
     observation = self.env.unwrapped.observation()
+    # print('REWARD', reward)
+    # print('OBSERVATION')
+    # for k, v in observation[0].items():
+    #   print(k, v)
+    # assert 0, (reward, observation)
     if observation is None:
       return reward
 
@@ -283,8 +288,8 @@ class CheckpointRewardWrapper(gym.RewardWrapper):
           'ball_owned_player' not in o or
           o['ball_owned_player'] != o['active']):
         continue
-
       d = ((o['ball'][0] - 1) ** 2 + o['ball'][1] ** 2) ** 0.5
+      # print('BALL', o['ball'], d)
 
       # Collect the checkpoints.
       # We give reward for distance 1 to 0.2.
