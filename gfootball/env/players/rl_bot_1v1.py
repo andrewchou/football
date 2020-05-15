@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from collections import namedtuple
+
 import numpy as np
 import pygame
 
@@ -280,19 +282,106 @@ class Player(player_base.PlayerBase):
                     return direction_action
         return move_action
 
+    def _opponent_angle_bucket_relative_to_me(self):
+        position = self._get_own_position()
+        opponent = self._closest_opponent_to_object(o=position)
+        delta = opponent - position
+        # Angle in radians, in the range [-pi, pi].
+        radians = np.arctan2(delta[1], delta[0])
+        degrees = radians * 180 / np.pi
+        assert -180 <= degrees <= 180, degrees
+        degrees_plus_210 = degrees + 210  # [30, 390]
+        assert 30 <= degrees_plus_210 <= 390, degrees_plus_210
+        wrapped_degrees_plus_210 = degrees_plus_210 % 360
+        assert 0 <= wrapped_degrees_plus_210 <= 360, wrapped_degrees_plus_210
+        bucket = wrapped_degrees_plus_210 // 60  #
+        if bucket == 6:
+            assert wrapped_degrees_plus_210 == 360, wrapped_degrees_plus_210
+            bucket = 5
+        assert 0 <= bucket <= 5, bucket
+        bucket = (bucket + 3) % 6
+        # print('BUCKET')
+        # print(position)
+        # print(opponent)
+        # print(delta)
+        # print(degrees)
+        # print(bucket)
+        assert int(bucket) == bucket, bucket
+        return int(bucket)
+
+    def _opponent_distance_from_me(self):
+        position = self._get_own_position()
+        opponent = self._closest_opponent_to_object(o=position)
+        return self._object_distance(object1=position, object2=opponent)
+
+    def get_state(self, observations):
+        assert len(observations) == 1, len(observations)
+        observation = observations[0]
+        del observations
+        if observation['ball_owned_player'] == -1:
+            assert observation['ball_owned_team'] == -1, observation
+        else:
+            assert observation['ball_owned_team'] in (0, 1), observation
+        field_position = []
+        own_position = self._get_own_position()
+        if own_position[0] < 0:
+            field_position.append('B')
+        else:
+            field_position.append('F')
+        if own_position[1] > 0.14 * self.pitch_scale:
+            field_position.append('R')  # Right side, aka closer to the camera
+        elif own_position[1] < -0.14 * self.pitch_scale:
+            field_position.append('L')  # Left side, aka further to the camera
+        else:
+            field_position.append('C')
+        assert observation['game_mode'] in set(range(7)), observation['game_mode']
+        return BasicState(
+            ball_owned_team=observation['ball_owned_team'],
+            field_position=tuple(field_position),
+            opponent_angle_bucket=self._opponent_angle_bucket_relative_to_me(),
+            opponent_close=bool(self._opponent_distance_from_me() < 0.2),
+            sticky_actions=tuple(observation['sticky_actions']),
+            run_of_play=bool(observation['game_mode'] == 0),
+        )
+
+
     def take_action(self, observations):
         if not self._init_done:
             self._init_done = True
             pygame.display.set_mode((1, 1), pygame.NOFRAME)
         assert len(observations) == 1, 'Bot does not support multiple player control'
         print()
-        print('OBS')
-        for k, v in sorted(observations[0].items()):
-            if k != 'frame':
-                print(k, v)
-        print()
+        # print('OBS')
+        # for k, v in sorted(observations[0].items()):
+        #     if k != 'frame':
+        #         print(k, v)
         self._observation = observations[0]
+        print(self.get_state(observations=observations))
+        print()
         self._last_action = self._get_action()
         assert self._last_action in action_set_dict['default'], self._last_action
         print(self._last_action)
         return [self._last_action]
+
+class BasicState(namedtuple('BasicState', [
+    'ball_owned_team', # 3
+    'field_position', # 6 spots (front/back, right/left/center)
+    'opponent_angle_bucket', # 6 (60 degree buckets)
+    'opponent_close', # 2 (close, far)
+    'sticky_actions', # 11 (none on, 1 of 10 on)
+    'run_of_play', # 2 (normal vs all others)
+])):
+    def __new__(cls, *args, **kwargs):
+        self = super(BasicState, cls).__new__(cls, *args, **kwargs)
+        assert self.ball_owned_team in (-1, 0, 1), self
+        assert isinstance(self.field_position, tuple), self
+        assert len(self.field_position) == 2, self
+        assert self.field_position[0] in ['F', 'B'], self
+        assert self.field_position[1] in ['R', 'L', 'C'], self
+        assert self.opponent_angle_bucket in (0, 1, 2, 3, 4, 5), self
+        assert isinstance(self.opponent_close, bool), self
+        assert isinstance(self.sticky_actions, tuple), self
+        assert len(self.sticky_actions) == 10, self
+        assert sum(self.sticky_actions) in [0, 1], self
+        assert isinstance(self.run_of_play, bool), self
+        return self

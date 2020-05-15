@@ -28,7 +28,7 @@ import numpy as np
 from absl import logging
 
 from gfootball.env.config import Config
-from gfootball.env.players import keyboard, ppo2_cnn, bot_1v1
+from gfootball.env.players import keyboard, ppo2_cnn, bot_1v1, rl_bot_1v1
 
 from gfootball.env import config as cfg
 from gfootball.env import constants
@@ -36,6 +36,12 @@ from gfootball.env import football_action_set
 from gfootball.env import football_env_core
 from gfootball.env import observation_rotation
 
+PLAYERS_BY_NAME = {
+    'keyboard': keyboard.Player,
+    'ppo2_cnn': ppo2_cnn.Player,
+    'bot_1v1': bot_1v1.Player,
+    'rl_bot_1v1': rl_bot_1v1.Player,
+}
 class FootballEnv(gym.Env):
     """Allows multiple players to play in the same environment."""
 
@@ -71,14 +77,10 @@ class FootballEnv(gym.Env):
                 config[config_name] += 1
             else:
                 config[config_name] = 0
-            if name == 'keyboard':
-                player_class = keyboard.Player
-            elif name == 'ppo2_cnn':
-                player_class = ppo2_cnn.Player
-            elif name == 'bot_1v1':
-                player_class = bot_1v1.Player
+            if name in PLAYERS_BY_NAME:
+                player_class = PLAYERS_BY_NAME[name]
             else:
-                assert 0, 'Unknown player class: %s' % name
+                assert 0, 'Unknown player class: %s. Choose from: %s' % (name, sorted(PLAYERS_BY_NAME))
             player_config = copy.deepcopy(config)
             player_config.update(d)
             if 'checkpoint' in player_config:
@@ -161,12 +163,6 @@ class FootballEnv(gym.Env):
 
     def _get_actions(self):
         obs = self._env.observation()
-        print()
-        print('OBS')
-        for k, v in sorted(obs.items()):
-            if k != 'frame':
-                print(k, v)
-        print()
         # assert 0, obs
         left_actions = []
         right_actions = []
