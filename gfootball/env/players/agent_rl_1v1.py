@@ -238,7 +238,7 @@ class Player(player_base.PlayerBase):
         active = self._get_own_position()
         # Corner etc. - just pass the ball
         if self._observation['game_mode'] != 0:
-            print('Not in the run of play. Mode:', self._observation['game_mode'])
+            if self.verbose: print('Not in the run of play. Mode:', self._observation['game_mode'])
             # print(self._observation)
             sticky_actions = self._get_sticky_actions()
             if not sticky_actions[4]:
@@ -247,7 +247,8 @@ class Player(player_base.PlayerBase):
 
         #
         if self._they_have_the_ball():
-            print('OTHER_TEAM_HAS_THE_BALL')
+            if self.verbose:
+                print('OTHER_TEAM_HAS_THE_BALL')
             move_target = self._get_ball_owner_location_target()
             return self._direction_action(move_target - active)
             # if self._last_action == football_action_set.action_pressure:
@@ -267,10 +268,12 @@ class Player(player_base.PlayerBase):
         GOOD_SPOT_TO_SHOOT_FROM = (target_x, 0)
         distance_from_good_spot_to_shoot_from = np.linalg.norm(
             self._get_ball_location_target() - GOOD_SPOT_TO_SHOOT_FROM)
-        print('distance_from_good_spot_to_shoot_from', distance_from_good_spot_to_shoot_from,
+        if self.verbose:
+            print('distance_from_good_spot_to_shoot_from', distance_from_good_spot_to_shoot_from,
             self._get_ball_location_target(), GOOD_SPOT_TO_SHOOT_FROM)
         if distance_from_good_spot_to_shoot_from < self._shoot_distance:
-            print('SHOOTING')
+            if self.verbose:
+                print('SHOOTING')
             return football_action_set.action_shot
 
         move_target = GOOD_SPOT_TO_SHOOT_FROM
@@ -384,9 +387,10 @@ class Player(player_base.PlayerBase):
         possible_actions_dict = self.Q[new_state]
         best_action_value = max(possible_actions_dict.values()) if possible_actions_dict else 0
         alpha = 0.01
+        discount = 0.999
         self.Q[old_state][action] = (
             (1.0 - alpha) * self.Q[old_state][action] +
-            alpha * (reward.item() + 0.999 * best_action_value)
+            alpha * (reward.item() + discount * best_action_value)
         )
         assert isinstance(self.Q[old_state][action], float), self.Q[old_state][action]
         # if reward.item() != 0:

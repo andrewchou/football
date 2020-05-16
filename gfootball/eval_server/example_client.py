@@ -25,6 +25,8 @@ import tensorflow.compat.v2 as tf
 from absl import app
 from absl import flags
 from absl import logging
+
+from gfootball.env.football_action_set import DEFAULT_ACTION_SET
 from gfootball.env.football_env import FootballEnv
 
 import gfootball.env as football_env
@@ -95,6 +97,9 @@ def get_player(checkpoint):
     env_config = {
         'action_set': 'default',
         'pitch_scale': 1.0,
+        'warmstart': False,
+        'random_frac': 0.0,
+        'verbose': False,
     }
     # return Player(player_config=player_config, env_config=None)
     # return agent_1v1.Player(player_config=player_config, env_config=env_config)
@@ -147,7 +152,8 @@ def main(unused_argv):
             #     assert len(actions) == 1, actions
             print(actions)
             for k, v in sorted(obs[0].items()): print(k, v)
-            actions = [a._backend_action for a in actions]
+            ACTION_TO_INDEX_MAP = {a:i for i, a in enumerate(DEFAULT_ACTION_SET)}
+            actions = [ACTION_TO_INDEX_MAP[a] for a in actions]
             obs, rew, done, _ = env.step(actions)
             logging.info('Playing the game, step %d, action %s, rew %s, done %d',
                 cnt, actions, rew, done)
