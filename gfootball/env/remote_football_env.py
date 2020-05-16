@@ -56,7 +56,7 @@ class RemoteFootballEnv(gym.Env):
                include_rendering=False):
     self._config = FakeConfig(
         config.track_to_num_controlled_players.get(track, 1))
-    self._num_actions = len(football_action_set.action_set_dict['default'])
+    self._num_actions = len(football_action_set.ACTION_SET_DICT['default'])
     self._track = track
     self._include_rendering = include_rendering
 

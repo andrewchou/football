@@ -68,7 +68,7 @@ class ObservationRotationTest(tf.test.TestCase):
 
   def testActionFlipping(self):
     cfg = config.Config()
-    for action in football_action_set.full_action_set:
+    for action in football_action_set.FULL_ACTION_SET:
       # Flipping twice should give the same action.
       action_id = observation_rotation.flip_single_action(
           observation_rotation.flip_single_action(action, cfg), cfg)

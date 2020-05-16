@@ -127,7 +127,7 @@ action_release_dribble = CoreAction(e_BackendAction.release_dribble,
 # ***** Define some action sets *****
 
 # Special action set that includes all the core actions in the same order.
-full_action_set = [
+FULL_ACTION_SET = [
     action_idle, action_left, action_top_left, action_top,
     action_top_right, action_right, action_bottom_right,
     action_bottom, action_bottom_left, action_long_pass,
@@ -142,33 +142,33 @@ full_action_set = [
     action_release_switch, action_release_sprint,
     action_release_dribble
 ]
+DEFAULT_ACTION_SET = [
+    action_idle,
+    action_left,
+    action_top_left,
+    action_top,
+    action_top_right,
+    action_right,
+    action_bottom_right,
+    action_bottom,
+    action_bottom_left,
+    action_long_pass,
+    action_high_pass,
+    action_short_pass,
+    action_shot,
+    action_sprint,
+    action_release_direction,
+    action_release_sprint,
+    action_sliding,
+    action_dribble,
+    action_release_dribble,
+]
 
-action_set_dict = {
+ACTION_SET_DICT = {
     # "full" action set is needed by the play_game script.
     # Don't use it for training models.
-    "full":
-        full_action_set,
-    "default": [
-        action_idle,
-        action_left,
-        action_top_left,
-        action_top,
-        action_top_right,
-        action_right,
-        action_bottom_right,
-        action_bottom,
-        action_bottom_left,
-        action_long_pass,
-        action_high_pass,
-        action_short_pass,
-        action_shot,
-        action_sprint,
-        action_release_direction,
-        action_release_sprint,
-        action_sliding,
-        action_dribble,
-        action_release_dribble,
-    ],
+    "full": FULL_ACTION_SET,
+    "default": DEFAULT_ACTION_SET,
 }
 
 reverse_action_mapping = {
@@ -199,7 +199,7 @@ reverse_action_mapping = {
 # Returns action set specified by the config.
 def get_action_set(config):
   action_set_name = config["action_set"]
-  return action_set_dict[action_set_name]
+  return ACTION_SET_DICT[action_set_name]
 
 def get_sticky_actions(config):
   """Returns list of sticky actions for the currently used action set."""

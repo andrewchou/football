@@ -28,7 +28,7 @@ import numpy as np
 from absl import logging
 
 from gfootball.env.config import Config
-from gfootball.env.players import keyboard, ppo2_cnn, bot_1v1, rl_bot_1v1
+from gfootball.env.players import keyboard, ppo2_cnn, agent_1v1, agent_rl_1v1
 
 from gfootball.env import config as cfg
 from gfootball.env import constants
@@ -39,15 +39,17 @@ from gfootball.env import observation_rotation
 PLAYERS_BY_NAME = {
     'keyboard': keyboard.Player,
     'ppo2_cnn': ppo2_cnn.Player,
-    'bot_1v1': bot_1v1.Player,
-    'rl_bot_1v1': rl_bot_1v1.Player,
+    'agent_1v1': agent_1v1.Player,
+    'agent_rl_1v1': agent_rl_1v1.Player,
 }
 class FootballEnv(gym.Env):
     """Allows multiple players to play in the same environment."""
 
     def __init__(self, config):
         self._config = config
-        player_config = {'index': 0}
+        player_config = {
+            'index': 0,
+        }
         # There can be at most one agent at a time. We need to remember its
         # team and the index on the team to generate observations appropriately.
         self._agent = None
@@ -86,7 +88,7 @@ class FootballEnv(gym.Env):
             if 'checkpoint' in player_config:
                 player_config['checkpoint'] = expanduser(player_config['checkpoint'])
             player = player_class(player_config=player_config, env_config=self._config)
-            if name == 'agent':
+            if name.startswith('agent_'):
                 assert not self._agent, 'Only one \'agent\' player allowed'
                 self._agent = player
                 self._agent_index = len(result)
@@ -161,20 +163,30 @@ class FootballEnv(gym.Env):
             return [a]
         return a
 
+    def get_players_and_relative_obs_pairs(self, obs):
+        players_and_relative_obs_pairs = []
+        left_player_position = 0
+        right_player_position = 0
+        agent_obs = None
+        for player_index, player in enumerate(self._players):
+            adopted_obs = self._convert_observations(
+                original=obs, player=player,
+                left_player_position=left_player_position,
+                right_player_position=right_player_position)
+            left_player_position += player.num_controlled_left_players()
+            right_player_position += player.num_controlled_right_players()
+            players_and_relative_obs_pairs.append((player, adopted_obs))
+            if player_index == self._agent_index:
+                agent_obs = adopted_obs
+        return players_and_relative_obs_pairs, agent_obs
+
     def _get_actions(self):
         obs = self._env.observation()
+        players_and_relative_obs_pairs, agent_obs = self.get_players_and_relative_obs_pairs(obs=obs)
         # assert 0, obs
         left_actions = []
         right_actions = []
-        left_player_position = 0
-        right_player_position = 0
-        # assert 0, self._players
-        for player in self._players:
-            adopted_obs = self._convert_observations(obs, player,
-                left_player_position,
-                right_player_position)
-            left_player_position += player.num_controlled_left_players()
-            right_player_position += player.num_controlled_right_players()
+        for player, adopted_obs in players_and_relative_obs_pairs:
             a = self._action_to_list(player.take_action(adopted_obs))
             assert len(adopted_obs) == len(
                 a), 'Player provided {} actions instead of {}.'.format(
@@ -187,25 +199,36 @@ class FootballEnv(gym.Env):
             left_actions.extend(a[:player.num_controlled_left_players()])
             right_actions.extend(a[player.num_controlled_left_players():])
         actions = left_actions + right_actions
-        return actions
+        return actions, agent_obs
 
-    def step(self, action):
-        action = self._action_to_list(action)
-        if self._agent:
-            self._agent.set_action(action)
-        else:
-            assert len(
-                action
-            ) == 0, 'step() received {} actions, but no agent is playing.'.format(
-                len(action))
+    def step(self):
+        # action = self._action_to_list(action)
+        # if self._agent:
+        #     self._agent.set_action(action)
+        # else:
+        #     assert len(
+        #         action
+        #     ) == 0, 'step() received {} actions, but no agent is playing.'.format(
+        #         len(action))
 
-        _, reward, done, info = self._env.step(self._get_actions())
+        actions, agent_obs = self._get_actions()
+        _, reward, done, info = self._env.step(actions)
         score_reward = reward
         if self._agent:
             reward = ([reward] * self._agent.num_controlled_left_players() +
                       [-reward] * self._agent.num_controlled_right_players())
+        # for player in self._players:
+        #     if player.num_controlled_left_players() > 0:
+        #         assert player.num_controlled_right_players() == 0
+        #         player.give_reward(reward=reward)
+        #     elif player.num_controlled_right_players() > 0:
+        #         assert player.num_controlled_left_players() == 0
+        #         player.give_reward(reward=-reward)
         self._cached_observation = None
         info['score_reward'] = score_reward
+        if self._agent is not None:
+            info['agent_action'] = actions[self._agent_index]
+            info['agent_obs'] = actions[self._agent_index]
         return (self.observation(), np.array(reward, dtype=np.float32), done, info)
 
     def reset(self):

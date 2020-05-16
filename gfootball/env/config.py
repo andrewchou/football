@@ -15,14 +15,9 @@
 
 """Config loader."""
 
-from __future__ import print_function
-
 import copy
 
 import gfootball_engine as libgame
-from absl import flags
-
-FLAGS = flags.FLAGS
 
 def parse_player_definition(definition):
     """Parses player definition.

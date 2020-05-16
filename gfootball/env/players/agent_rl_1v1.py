@@ -1,29 +1,14 @@
-# coding=utf-8
-# Copyright 2019 Google LLC
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-
 """Sample bot player."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+import pickle
+import random
+from collections import defaultdict, namedtuple
 
 import numpy as np
 import pygame
 
 from gfootball.env import football_action_set
 from gfootball.env import player_base
-from gfootball.env.football_action_set import action_set_dict
+from gfootball.env.football_action_set import DEFAULT_ACTION_SET
 
 class Player(player_base.PlayerBase):
 
@@ -36,8 +21,40 @@ class Player(player_base.PlayerBase):
         self._last_action = football_action_set.action_idle
         self._shoot_distance = 0.25  # 0.15
         self._pressure_enabled = False
+
+        self._warmstart = env_config['warmstart']
+        assert isinstance(self._warmstart, bool)
+        self.random_frac = env_config['random_frac']
+        self.verbose = env_config['verbose']
+
+        self._prev_state = None
+        self.Q = defaultdict(lambda: defaultdict(float))
+        # self._state_values = defaultdict(float)
+        # self._transitions_counts = defaultdict(lambda : defaultdict(int))
+
         pygame.init()
         self._init_done = False
+
+        # self._action = None
+
+    def load(self, checkpoint):
+        with open(checkpoint, 'rb') as inf:
+            Q = pickle.load(inf)
+        n = 0
+        for state, action_values_dict in Q.items():
+            for action, value in action_values_dict.items():
+                if value != 0.0:
+                    # print('LOADED:', state, action, value)
+                    self.Q[state][action] = value
+                    n += 1
+        print('Loaded %d Q values.' % n)
+
+    def save(self, checkpoint):
+        Q = {k: {k2: v2 for k2, v2 in v.items() if v2 != 0.0} for k, v in self.Q.items()}
+        n = sum([len(v) for v in Q.values()])
+        with open(checkpoint, 'wb') as f:
+            pickle.dump(Q, f)
+        print('Saved %d Q values.' % n)
 
     def _object_distance(self, object1, object2):
         """Computes distance between two objects."""
@@ -250,7 +267,8 @@ class Player(player_base.PlayerBase):
         GOOD_SPOT_TO_SHOOT_FROM = (target_x, 0)
         distance_from_good_spot_to_shoot_from = np.linalg.norm(
             self._get_ball_location_target() - GOOD_SPOT_TO_SHOOT_FROM)
-        print('distance_from_good_spot_to_shoot_from', distance_from_good_spot_to_shoot_from, self._get_ball_location_target(), GOOD_SPOT_TO_SHOOT_FROM)
+        print('distance_from_good_spot_to_shoot_from', distance_from_good_spot_to_shoot_from,
+            self._get_ball_location_target(), GOOD_SPOT_TO_SHOOT_FROM)
         if distance_from_good_spot_to_shoot_from < self._shoot_distance:
             print('SHOOTING')
             return football_action_set.action_shot
@@ -280,19 +298,166 @@ class Player(player_base.PlayerBase):
                     return direction_action
         return move_action
 
+    def _opponent_angle_bucket_relative_to_me(self):
+        position = self._get_own_position()
+        opponent = self._closest_opponent_to_object(o=position)
+        return self._angle_bucket_relative_to_me(other_position=opponent)
+
+    def _ball_angle_bucket_relative_to_me(self):
+        return self._angle_bucket_relative_to_me(other_position=self._get_ball_location_target())
+
+    def _angle_bucket_relative_to_me(self, other_position):
+        position = self._get_own_position()
+        delta = other_position - position
+        # Angle in radians, in the range [-pi, pi].
+        radians = np.arctan2(delta[1], delta[0])
+        degrees = radians * 180 / np.pi
+        assert -180 <= degrees <= 180, degrees
+        degrees_plus_210 = degrees + 210  # [30, 390]
+        assert 30 <= degrees_plus_210 <= 390, degrees_plus_210
+        wrapped_degrees_plus_210 = degrees_plus_210 % 360
+        assert 0 <= wrapped_degrees_plus_210 <= 360, wrapped_degrees_plus_210
+        bucket = wrapped_degrees_plus_210 // 60  #
+        if bucket == 6:
+            assert wrapped_degrees_plus_210 == 360, wrapped_degrees_plus_210
+            bucket = 5
+        assert 0 <= bucket <= 5, bucket
+        bucket = (bucket + 3) % 6
+        # print('BUCKET')
+        # print(position)
+        # print(opponent)
+        # print(delta)
+        # print(degrees)
+        # print(bucket)
+        assert int(bucket) == bucket, bucket
+        return int(bucket)
+
+    def _opponent_distance_from_me(self):
+        position = self._get_own_position()
+        opponent = self._closest_opponent_to_object(o=position)
+        return self._object_distance(object1=position, object2=opponent)
+
+    def _ball_distance_from_me(self):
+        position = self._get_own_position()
+        return self._object_distance(object1=position, object2=self._get_ball_location_target())
+
+    def get_state(self, observations):
+        assert len(observations) == 1, len(observations)
+        observation = observations[0]
+        del observations
+        if observation['ball_owned_player'] == -1:
+            assert observation['ball_owned_team'] == -1, observation
+        else:
+            assert observation['ball_owned_team'] in (0, 1), observation
+        field_position = []
+        own_position = self._get_own_position()
+        if own_position[0] < 0:
+            field_position.append('B')
+        else:
+            field_position.append('F')
+        if own_position[1] > 0.14 * self.pitch_scale:
+            field_position.append('R')  # Right side, aka closer to the camera
+        elif own_position[1] < -0.14 * self.pitch_scale:
+            field_position.append('L')  # Left side, aka further to the camera
+        else:
+            field_position.append('C')
+        assert observation['game_mode'] in set(range(7)), observation['game_mode']
+        return BasicState(
+            ball_owned_team=observation['ball_owned_team'],
+            field_position=tuple(field_position),
+            ball_angle_bucket=self._ball_angle_bucket_relative_to_me(),  # 6 (60 degree buckets)
+            ball_close=bool(self._ball_distance_from_me() < 0.2),  # 2 (close, far)
+            opponent_angle_bucket=self._opponent_angle_bucket_relative_to_me(),
+            opponent_close=bool(self._opponent_distance_from_me() < 0.2),
+            sticky_actions=tuple(observation['sticky_actions']),
+            run_of_play=bool(observation['game_mode'] == 0),
+        )
+
+    # def set_action(self, action):
+    #     self._action = action
+
+    def give_reward(self, old_relative_obs, action, new_relative_obs, reward):
+        # assert isinstance(old_state,)
+        assert self._last_action is not None
+        old_state = self.get_state(observations=old_relative_obs)
+        new_state = self.get_state(observations=new_relative_obs)
+        possible_actions_dict = self.Q[new_state]
+        best_action_value = max(possible_actions_dict.values()) if possible_actions_dict else 0
+        alpha = 0.01
+        self.Q[old_state][action] = (
+            (1.0 - alpha) * self.Q[old_state][action] +
+            alpha * (reward.item() + 0.999 * best_action_value)
+        )
+        assert isinstance(self.Q[old_state][action], float), self.Q[old_state][action]
+        # if reward.item() != 0:
+        #     assert 0, 'TODO'
+
     def take_action(self, observations):
         if not self._init_done:
             self._init_done = True
             pygame.display.set_mode((1, 1), pygame.NOFRAME)
         assert len(observations) == 1, 'Bot does not support multiple player control'
-        print()
-        print('OBS')
-        for k, v in sorted(observations[0].items()):
-            if k != 'frame':
-                print(k, v)
-        print()
+        if self.verbose: print()
+
+        # print('OBS')
+        # for k, v in sorted(observations[0].items()):
+        #     if k != 'frame':
+        #         print(k, v)
         self._observation = observations[0]
-        self._last_action = self._get_action()
-        assert self._last_action in action_set_dict['default'], self._last_action
-        print(self._last_action)
+        if self._warmstart:
+            action = self._get_action()
+            if self.verbose:
+                print('Warmstart action:', action)
+        else:
+            state = self.get_state(observations=observations)
+            if self.verbose:
+                print(state)
+            possible_actions_dict = self.Q[state]
+            if (not possible_actions_dict) or (random.random() < self.random_frac):
+                action = DEFAULT_ACTION_SET[random.randint(0, len(DEFAULT_ACTION_SET) - 1)]
+                if self.verbose:
+                    print('Random action:', action)
+            else:
+                assert possible_actions_dict
+                for a in DEFAULT_ACTION_SET:
+                    if a not in possible_actions_dict:
+                        possible_actions_dict[a] = 0.0
+                best_value = max(possible_actions_dict.values())
+                top_actions = [a for a in DEFAULT_ACTION_SET if possible_actions_dict[a] == best_value]
+                action = top_actions[random.randint(0, len(top_actions) - 1)]
+                if self.verbose:
+                    print(' Value action:', action, best_value, min(possible_actions_dict.values()))
+                assert isinstance(best_value, float)
+        self._last_action = action
+        # self._prev_state = cur_state
+        # assert self._last_action in ACTION_SET_DICT['default'], self._last_action
+        # print(self._last_action)
         return [self._last_action]
+
+class BasicState(namedtuple('BasicState', [
+    'ball_owned_team',  # 3
+    'field_position',  # 6 spots (front/back, right/left/center)
+    'ball_angle_bucket',  # 6 (60 degree buckets)
+    'ball_close',  # 2 (close, far)
+    'opponent_angle_bucket',  # 6 (60 degree buckets)
+    'opponent_close',  # 2 (close, far)
+    'sticky_actions',  # Many :(
+    'run_of_play',  # 2 (normal vs all others)
+])):
+    def __new__(cls, *args, **kwargs):
+        self = super(BasicState, cls).__new__(cls, *args, **kwargs)
+        assert self.ball_owned_team in (-1, 0, 1), self
+        assert isinstance(self.field_position, tuple), self
+        assert len(self.field_position) == 2, self
+        assert self.field_position[0] in ['F', 'B'], self
+        assert self.field_position[1] in ['R', 'L', 'C'], self
+        assert self.ball_angle_bucket in (0, 1, 2, 3, 4, 5), self
+        assert isinstance(self.ball_close, bool), self
+        assert self.opponent_angle_bucket in (0, 1, 2, 3, 4, 5), self
+        assert isinstance(self.opponent_close, bool), self
+        assert isinstance(self.sticky_actions, tuple), self
+        assert len(self.sticky_actions) == 10, self
+        # Example of more than 2: sticky_actions=(1, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+        # assert sum(self.sticky_actions) in [0, 1, 2], self
+        assert isinstance(self.run_of_play, bool), self
+        return self

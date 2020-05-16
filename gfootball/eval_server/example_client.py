@@ -30,10 +30,10 @@ from gfootball.env.football_env import FootballEnv
 import gfootball.env as football_env
 from gfootball.env import football_action_set
 from gfootball.env.config import Config
-from gfootball.env.players import bot_1v1
+from gfootball.env.players import agent_1v1, agent_rl_1v1
 from gfootball.env.players.ppo2_cnn import Player
 
-NUM_ACTIONS = len(football_action_set.action_set_dict['default'])
+NUM_ACTIONS = len(football_action_set.ACTION_SET_DICT['default'])
 
 def get_flags():
     FLAGS = flags.FLAGS
@@ -97,7 +97,8 @@ def get_player(checkpoint):
         'pitch_scale': 1.0,
     }
     # return Player(player_config=player_config, env_config=None)
-    return bot_1v1.Player(player_config=player_config, env_config=env_config)
+    # return agent_1v1.Player(player_config=player_config, env_config=env_config)
+    return agent_rl_1v1.Player(player_config=player_config, env_config=env_config)
 
 def main(unused_argv):
     # model = get_inference_model(FLAGS.inference_model)

@@ -69,7 +69,7 @@ class Player(player_base.PlayerBase):
         action = self._policy.step(observations)[0][0]
         print(action)
         assert self._action_set == 'default', self._action_set
-        actions = [football_action_set.action_set_dict[self._action_set][action]]
+        actions = [football_action_set.ACTION_SET_DICT[self._action_set][action]]
         # print(actions)
         return actions
 
@@ -118,6 +118,6 @@ class DummyEnv(object):
 
     def __init__(self, action_set, stacking):
         self.action_space = gym.spaces.Discrete(
-            len(football_action_set.action_set_dict[action_set]))
+            len(football_action_set.ACTION_SET_DICT[action_set]))
         self.observation_space = gym.spaces.Box(
             0, 255, shape=[72, 96, 4 * stacking], dtype=np.uint8)

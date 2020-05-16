@@ -45,7 +45,7 @@ class FootballActionSetTest(unittest.TestCase):
     self.assertRaises(Exception, named_action_from_action_set, action_set, 100)
 
   def test_action_set_full(self):
-    self.assertEqual(football_action_set.full_action_set[0],
+    self.assertEqual(football_action_set.FULL_ACTION_SET[0],
                      football_action_set.action_idle)
 
   def test_disable_action(self):
@@ -59,8 +59,8 @@ class FootballActionSetTest(unittest.TestCase):
         football_action_set.action_release_direction)
 
   def test_sticky_actions_have_release(self):
-    for i in football_action_set.action_set_dict:
-      action_set = football_action_set.action_set_dict[i]
+    for i in football_action_set.ACTION_SET_DICT:
+      action_set = football_action_set.ACTION_SET_DICT[i]
       for action in action_set:
         if action._sticky:
           reverse = football_action_set.disable_action(action)
