@@ -28,7 +28,7 @@ import numpy as np
 from absl import logging
 
 from gfootball.env.config import Config
-from gfootball.env.players import keyboard, ppo2_cnn, agent_1v1, agent_rl_1v1
+from gfootball.env.players import keyboard, ppo2_cnn, agent_1v1, agent_rl_1v1, agent_rl_3v3
 
 from gfootball.env import config as cfg
 from gfootball.env import constants
@@ -41,6 +41,7 @@ PLAYERS_BY_NAME = {
     'ppo2_cnn': ppo2_cnn.Player,
     'agent_1v1': agent_1v1.Player,
     'agent_rl_1v1': agent_rl_1v1.Player,
+    'agent_rl_3v3': agent_rl_3v3.Player,
 }
 class FootballEnv(gym.Env):
     """Allows multiple players to play in the same environment."""

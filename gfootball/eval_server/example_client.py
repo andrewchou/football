@@ -135,7 +135,7 @@ def main(unused_argv):
         while not done:
             # try:
             # action = model(ob)
-            print(obs)
+            # print(obs)
             assert len(obs) == 1, len(obs)
             # adopted_obs = FootballEnv.convert_observations_static(
             #     original=obs[0], player=player,

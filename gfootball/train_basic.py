@@ -1,6 +1,5 @@
 import argparse
 import logging
-import pickle
 
 from gfootball.env import config
 from gfootball.env import football_env
@@ -25,9 +24,11 @@ def parse_args():
         help='Semicolon separated list of players, single keyboard player on the left by default')
     parser.add_argument('--level', type=str, default='1_vs_1_easy', help='Level to play')
     parser.add_argument('--action_set', type=str, default='default', help='default or full')
-    parser.add_argument('--real_time', type=bool_arg, default=True, help='If true, environment will slow down so humans can play.')
+    parser.add_argument('--real_time', type=bool_arg, default=True,
+        help='If true, environment will slow down so humans can play.')
     parser.add_argument('--render', type=bool_arg, default=True, help='Whether to do game rendering.')
-    parser.add_argument('--warmstart', type=bool_arg, default=False, help='Whether to warmstart using the handmade agent.')
+    parser.add_argument('--warmstart', type=bool_arg, default=False,
+        help='Whether to warmstart using the handmade agent.')
     parser.add_argument('--verbose', type=bool_arg, default=True)
     parser.add_argument('--pitch_scale', type=float, default=0.5, help='Pitch scale. Can be 1.0 or 0.5 for now.')
     parser.add_argument('--checkpoint', type=str, default=None, help='Pickle file of Q')
@@ -62,9 +63,10 @@ def main():
     ]
     self_play_history = []
     running_score_update = 0.99
-    running_score = [0, 0]
+    running_score = [0, 0, 0]
     record = [0, 0, 0]
     try:
+        game_num = 0
         while True:
             obs, reward, done, info = env.step()
             # _, old_relative_obs = env.get_players_and_relative_obs_pairs(obs=obs_history[-1])
@@ -88,16 +90,18 @@ def main():
             if args.verbose:
                 print(reward, done, info)
             if done:
+                game_num += 1
                 score = obs[0]['score']
                 running_score[0] = running_score_update * running_score[0] + (1.0 - running_score_update) * score[0]
                 running_score[1] = running_score_update * running_score[1] + (1.0 - running_score_update) * score[1]
+                running_score[2] = running_score[0] - running_score[1]
                 if score[0] > score[1]:
                     record[0] += 1
                 elif score[0] < score[1]:
                     record[2] += 1
                 else:
                     record[1] += 1
-                print('Final Score:', score, 'Running score: [%.3f, %.3f]' % tuple(running_score), 'Record:', record)
+                print('Final Score:', score, 'Running score: [%.3f, %.3f, %.3f]' % tuple(running_score), 'Record:', record)
                 for (old_relative_obs, action, new_relative_obs, reward) in reversed(self_play_history):
                     env._agent.give_reward(
                         old_relative_obs=old_relative_obs,
@@ -106,10 +110,12 @@ def main():
                         reward=reward)
                 env.reset()
                 self_play_history = []
-                env._agent.save(checkpoint='agent.pkl')
+                if (not args.real_time) and (game_num % 10 == 0):
+                    env._agent.save(checkpoint='agent.pkl')
     except KeyboardInterrupt:
         logging.warning('Game stopped, writing dump...')
-        env._agent.save(checkpoint='agent.pkl')
+        if (not args.real_time):
+            env._agent.save(checkpoint='agent.pkl')
         env.write_dump('shutdown')
         return env._agent
         exit(1)
