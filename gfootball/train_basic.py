@@ -1,5 +1,6 @@
 import argparse
 import logging
+from collections import defaultdict
 
 from gfootball.env import config
 from gfootball.env import football_env
@@ -33,6 +34,7 @@ def parse_args():
     parser.add_argument('--pitch_scale', type=float, default=0.5, help='Pitch scale. Can be 1.0 or 0.5 for now.')
     parser.add_argument('--checkpoint', type=str, default=None, help='Pickle file of Q')
     parser.add_argument('--random_frac', type=float, default=0.1, help='')
+    parser.add_argument('--video', type=str, default='', help='')
     args = parser.parse_args()
     return args
 
@@ -50,6 +52,7 @@ def main():
         'warmstart': args.warmstart,
         'random_frac': args.random_frac,
         'verbose': args.verbose,
+        'video': args.video,
     })
     if args.level:
         cfg['level'] = args.level
@@ -67,6 +70,7 @@ def main():
     record = [0, 0, 0]
     try:
         game_num = 0
+        # cnts_by_mode = defaultdict(int)
         while True:
             obs, reward, done, info = env.step()
             # _, old_relative_obs = env.get_players_and_relative_obs_pairs(obs=obs_history[-1])
@@ -86,10 +90,13 @@ def main():
                 obs,
                 reward,
             ))
+            # cnts_by_mode[(obs[0]['game_mode'], obs[0]['ball_owned_team'])] += 1
             obs_history.append(obs)
             if args.verbose:
                 print(reward, done, info)
             if done:
+                # defaultdict(<class 'int'>, {(0, -1): 36256, (0, 0): 12701, (0, 1): 55352, (2, -1): 1871, (3, -1): 2146, (5, 1): 140, (5, 0): 19269, (4, -1): 1119, (5, -1): 1, (6, -1): 145})
+                # print(cnts_by_mode)
                 game_num += 1
                 score = obs[0]['score']
                 running_score[0] = running_score_update * running_score[0] + (1.0 - running_score_update) * score[0]

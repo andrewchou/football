@@ -18,3 +18,4 @@ cmake-build-debug/
 /checkpoints/
 *.txt
 *.pkl
+*.mp4

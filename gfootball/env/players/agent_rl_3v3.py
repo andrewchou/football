@@ -6,10 +6,12 @@ from collections import defaultdict, namedtuple
 import numpy as np
 import pygame
 
+from gfootball.common.writer import Writer
 from gfootball.env import football_action_set
 from gfootball.env import player_base
 from gfootball.env.football_action_set import DEFAULT_ACTION_SET
 from gfootball.scenarios import e_PlayerRole_GK, e_PlayerRole_CB, e_PlayerRole_CF
+from third_party import gfootball_engine
 
 class Player(player_base.PlayerBase):
 
@@ -20,13 +22,17 @@ class Player(player_base.PlayerBase):
         player_base.PlayerBase.__init__(self, player_config)
         self._observation = None
         self._last_action = football_action_set.action_idle
-        self._shoot_distance = 0.25  # 0.15
+        self._shoot_distance = 0.15
         self._pressure_enabled = False
 
         self._warmstart = env_config['warmstart']
         assert isinstance(self._warmstart, bool)
         self.random_frac = env_config['random_frac']
         self.verbose = env_config['verbose']
+        if env_config['video']:
+            self.writer = Writer(filename=env_config['video'])
+        else:
+            self.writer = None
 
         self._prev_state = None
         self.Q = defaultdict(lambda: defaultdict(float))
@@ -73,8 +79,9 @@ class Player(player_base.PlayerBase):
             football_action_set.action_right,
             football_action_set.action_top_right
         ]
-        all_directions_vec = [(0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1),
-            (1, 0), (1, -1)]
+        all_directions_vec = [
+            (0, -1), (-1, -1), (-1, 0), (-1, 1),
+            (0, 1), (1, 1), (1, 0), (1, -1)]
         all_directions_vec = [
             np.array(v) / np.linalg.norm(np.array(v)) for v in all_directions_vec
         ]
@@ -104,7 +111,7 @@ class Player(player_base.PlayerBase):
         return closest
 
     def _closest_team_member_index_to_object(self, o):
-        '''For a given object returns the closest opponent.
+        '''For a given object returns the closest team member index.
 
         Args:
           o: Source object.
@@ -115,11 +122,17 @@ class Player(player_base.PlayerBase):
         closest_i = None
         for i, p in enumerate(self._observation['left_team']):
             d = self._object_distance(o, p)
-            if min_d is None or d < min_d:
+            if ((min_d is None) or (d < min_d)) and (self._get_role(index=i) != e_PlayerRole_GK):
                 min_d = d
                 closest_i = i
         assert closest_i is not None
         return closest_i
+
+    def _closest_team_member_index_to_opponent_with_ball(self):
+        return self._closest_team_member_index_to_object(o=self._get_ball_owner_location())
+
+    def _am_closest_team_member_to_opponent_with_ball(self):
+        return self._closest_team_member_index_to_object(self._get_ball_owner_location()) == self._get_own_index()
 
     def _closest_front_opponent(self, o, target):
         '''For an object and its movement direction returns the closest opponent.
@@ -210,14 +223,17 @@ class Player(player_base.PlayerBase):
     def _get_ball_location_target(self):
         return self._observation['ball'][:2]
 
-    def _get_ball_owner_location_target(self):
+    def _get_ball_owner_location(self):
         assert self._observation['ball_owned_team'] == 1, self._observation
         other_team_positions = self._observation['right_team']
         other_player_with_ball_position = other_team_positions[self._observation['ball_owned_player']]
-        return other_player_with_ball_position - self._get_own_position()
+        return other_player_with_ball_position
+
+    def _get_ball_owner_location_target(self):
+        return self._get_ball_owner_location() - self._get_own_position()
 
     def _get_own_position(self):
-        return self._observation['left_team'][self._observation['active']]
+        return self._observation['left_team'][self._get_own_index()]
 
     def _they_have_the_ball(self):
         return self._observation['ball_owned_team'] == 1
@@ -228,33 +244,52 @@ class Player(player_base.PlayerBase):
     def _get_sticky_actions(self):
         return self._observation['sticky_actions']
 
+    def _get_own_index(self):
+        return self._observation['active']
+
+    def _get_assigned_opponent_to_defend(self):
+        assert self._observation['ball_owned_team'] == 1, self._observation
+        other_team_positions = self._observation['right_team']
+        ball_owner_index = self._observation['ball_owned_player']
+        # 0 is the keeper
+        if ball_owner_index == 0:
+            # Match up with the opposite type of player
+            other_player_with_ball_position = other_team_positions[3 - self._get_own_index()]
+        else:
+            assert ball_owner_index in (1, 2), ball_owner_index
+            other_player_with_ball_position = other_team_positions[3 - ball_owner_index]
+        return other_player_with_ball_position - self._get_own_position()
+
     def _get_action(self):
         '''Returns action to perform for the current observations.'''
         active = self._get_own_position()
         # Corner etc. - just pass the ball
-        if self._observation['game_mode'] != 0:
+        if self._observation['game_mode'] != gfootball_engine.e_GameMode.e_GameMode_Normal:
             if self.verbose: print('Not in the run of play. Mode:', self._observation['game_mode'])
-            # print(self._observation)
-            # sticky_actions = self._get_sticky_actions()
-            # if not sticky_actions[4]:
-            #     return football_action_set.action_right
             # There's a keeper, so dont worry about own goals
             return DEFAULT_ACTION_SET[random.randint(0, len(DEFAULT_ACTION_SET) - 1)]
-            # return football_action_set.action_short_pass
-
         #
         if self._they_have_the_ball():
             if self.verbose:
                 print('OTHER_TEAM_HAS_THE_BALL')
-            move_target = self._get_ball_owner_location_target()
-            return self._direction_action(move_target - active)
+            if self._am_closest_team_member_to_opponent_with_ball():
+                move_target = self._get_ball_owner_location_target()
+                move_action = self._direction_action(move_target - active)
+                print('IM THE CLOSEST DEFENDER', move_target, move_action)
+            else:
+                move_target = self._get_assigned_opponent_to_defend()
+                move_action = self._direction_action(move_target - active)
+                print('IM SECONDARY DEFENDER', move_target, move_action)
+            return move_action
             # if self._last_action == football_action_set.action_pressure:
             #     return football_action_set.action_sprint
             # self._pressure_enabled = True
             # return football_action_set.action_pressure
         if not self._we_have_the_ball():
             move_target = self._get_ball_location_target()
-            return self._direction_action(move_target - active)
+            move_action = self._direction_action(move_target - active)
+            print('RUNNING TO THE BALL:', move_action)
+            return move_action
 
         # if self._pressure_enabled:
         #     self._pressure_enabled = False
@@ -287,14 +322,17 @@ class Player(player_base.PlayerBase):
         if dist_front_opp < 0.08:
             best_pass_target = self._best_pass_target(active)
             if np.array_equal(best_pass_target, active):
-                move_action = self._avoid_opponent(active, closest_front_opponent,
-                    move_target)
+                move_action = self._avoid_opponent(
+                    active, closest_front_opponent, move_target)
+                print('DRIBBLING:', move_action)
             else:
                 delta = best_pass_target - active
                 direction_action = self._direction_action(delta)
                 if self._last_action == direction_action:
+                    print('PASSING')
                     return football_action_set.action_short_pass
                 else:
+                    print('PREPARING FOR PASS:', direction_action)
                     return direction_action
         return move_action
 
@@ -352,7 +390,7 @@ class Player(player_base.PlayerBase):
         )
 
     def _get_teammate_position(self):
-        active_index = self._observation['active']
+        active_index = self._get_own_index()
         assert active_index in [1, 2], active_index
         return self._observation['left_team'][3 - active_index]
 
@@ -366,8 +404,10 @@ class Player(player_base.PlayerBase):
             (num_opponents_closer_to_their_goal < 2) and (teammate_pos[0] > 0)
         )
 
-    def _get_role(self):
-        return int(self._observation['left_team_roles'][self._observation['active']])
+    def _get_role(self, index=None):
+        if index is None:
+            index = self._get_own_index()
+        return int(self._observation['left_team_roles'][index])
 
     def get_state(self, observations):
         assert len(observations) == 1, len(observations)
@@ -450,7 +490,7 @@ class Player(player_base.PlayerBase):
         new_state = self.get_state(observations=new_relative_obs)
         possible_actions_dict = self.Q[new_state]
         best_action_value = max(possible_actions_dict.values()) if possible_actions_dict else 0
-        alpha = 0.001
+        alpha = 0.0001
         discount = 0.999
         self.Q[old_state][action] = (
             (1.0 - alpha) * self.Q[old_state][action] +
@@ -473,6 +513,8 @@ class Player(player_base.PlayerBase):
         #         print(k, v)
         self._observation = observations[0]
         state = self.get_state(observations=observations)
+        if self.writer:
+            self.writer.write(frame=self._observation['frame'][:, :, [2, 1, 0]])
         if self.verbose:
             print(state)
         if self._warmstart:
