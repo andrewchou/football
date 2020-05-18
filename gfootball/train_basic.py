@@ -109,7 +109,10 @@ def main():
                     record[2] += 1
                 else:
                     record[1] += 1
-                print('Final Score:', score, 'Running score: [%.3f, %.3f, %.3f]' % tuple(running_score), 'Record:', record)
+                print(
+                    'Final Score:', score,
+                    'Running score: [%.3f, %.3f, %.3f]' % tuple([x / (1 - running_score_update ** game_num) for x in running_score]),
+                    'Record:', record)
                 for (old_relative_obs, action, new_relative_obs, reward) in reversed(self_play_history):
                     env._agent.give_reward(
                         old_relative_obs=old_relative_obs,
