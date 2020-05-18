@@ -35,6 +35,7 @@ def parse_args():
     parser.add_argument('--checkpoint', type=str, default=None, help='Pickle file of Q')
     parser.add_argument('--random_frac', type=float, default=0.1, help='')
     parser.add_argument('--video', type=str, default='', help='')
+    parser.add_argument('--num_games', type=int, default=1000000000, help='')
     args = parser.parse_args()
     return args
 
@@ -119,6 +120,8 @@ def main():
                 self_play_history = []
                 if (not args.real_time) and (game_num % 10 == 0):
                     env._agent.save(checkpoint='agent.pkl')
+                if game_num == args.num_games:
+                    break
     except KeyboardInterrupt:
         logging.warning('Game stopped, writing dump...')
         if (not args.real_time):
