@@ -23,7 +23,6 @@ class Player(player_base.PlayerBase):
         player_base.PlayerBase.__init__(self, player_config)
         self._observation = None
         self._last_action = football_action_set.action_idle
-        self._shoot_distance = 0.15
         self._pressure_enabled = False
 
         self._warmstart = env_config['warmstart']
@@ -297,16 +296,13 @@ class Player(player_base.PlayerBase):
         target_x = 0.85 if self.pitch_scale == 1.0 else 0.35
         target_x = max(target_x, self._get_own_position()[0])
 
-        GOOD_SPOT_TO_SHOOT_FROM = (target_x, 0)
-        distance_from_good_spot_to_shoot_from = np.linalg.norm(
-            self._get_ball_location() - GOOD_SPOT_TO_SHOOT_FROM)
-        debug.append((
-            'distance_from_good_spot_to_shoot_from', distance_from_good_spot_to_shoot_from,
-            self._get_ball_location(), GOOD_SPOT_TO_SHOOT_FROM))
-        if distance_from_good_spot_to_shoot_from < self._shoot_distance:
-            debug.append('SHOOTING')
+        ball_location = self._get_ball_location()
+        debug.append(('ball_location', ball_location))
+        if (ball_location[0] > 0.7) and (abs(ball_location[0] < 0.15)):
+            debug.append(('SHOOTING', ball_location))
             return football_action_set.action_shot
 
+        GOOD_SPOT_TO_SHOOT_FROM = (target_x, 0)
         move_target = GOOD_SPOT_TO_SHOOT_FROM
         # Compute run direction.
         move_action = self._direction_action(move_target - own_position)

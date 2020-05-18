@@ -66,7 +66,7 @@ def main():
         env.reset(),  # Need this to know the initial state
     ]
     self_play_history = []
-    running_score_update = 0.99
+    running_score_update = 0.999
     running_score = [0, 0, 0]
     record = [0, 0, 0]
     try:
