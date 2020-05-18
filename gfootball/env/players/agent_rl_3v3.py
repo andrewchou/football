@@ -468,10 +468,10 @@ class Player(player_base.PlayerBase):
             ball_owned_team=observation['ball_owned_team'],
             field_position=tuple(field_position),
             ball_angle_bucket=self._ball_angle_bucket_relative_to_me(),  # 6 (60 degree buckets)
-            ball_close=bool(self._ball_distance_from_me() < 0.2),  # 2 (close, far)
+            ball_close=bool(self._ball_distance_from_me() < 0.1),
             closest_to_ball_on_my_team=bool(closest_team_member_index_to_ball == observation['active']),
             opponent_angle_bucket=self._opponent_angle_bucket_relative_to_me(),
-            opponent_close=bool(self._opponent_distance_from_me() < 0.2),
+            opponent_close=bool(self._opponent_distance_from_me() < 0.1),
             sticky_actions=tuple(observation['sticky_actions']),
             run_of_play=bool(observation['game_mode'] == 0),
             am_offside=self._am_offside(),
