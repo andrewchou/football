@@ -1,7 +1,9 @@
 import argparse
 import logging
-from collections import defaultdict
+import random
+from collections import defaultdict, namedtuple
 
+from gfootball.common.history import History, HistoryItem
 from gfootball.env import config
 from gfootball.env import football_env
 
@@ -65,7 +67,7 @@ def main():
     obs_history = [
         env.reset(),  # Need this to know the initial state
     ]
-    self_play_history = []
+    self_play_history = History(max_size=100000)
     running_score_update = 0.999
     running_score = [0, 0, 0]
     record = [0, 0, 0]
@@ -78,19 +80,14 @@ def main():
             # _, new_relative_obs = env.get_players_and_relative_obs_pairs(obs=obs)
             if env._agent.num_controlled_right_players() > 0:
                 reward *= -1
-            env._agent.give_reward(
-                # old_relative_obs=old_relative_obs,
-                old_relative_obs=obs_history[-1],
+            item = HistoryItem(
+                old_state=obs_history[-1],
                 action=info['agent_action'],
-                # new_relative_obs=new_relative_obs,
-                new_relative_obs=obs,
-                reward=reward)
-            self_play_history.append((
-                obs_history[-1],
-                info['agent_action'],
-                obs,
-                reward,
-            ))
+                new_state=obs,
+                reward=reward.item(),
+            )
+            env._agent.give_reward(item=item)
+            self_play_history.add(item=item)
             # cnts_by_mode[(obs[0]['game_mode'], obs[0]['ball_owned_team'])] += 1
             obs_history.append(obs)
             if args.verbose:
@@ -113,14 +110,9 @@ def main():
                     'Final Score:', score,
                     'Running score: [%.3f, %.3f, %.3f]' % tuple([x / (1 - running_score_update ** game_num) for x in running_score]),
                     'Record:', record)
-                for (old_relative_obs, action, new_relative_obs, reward) in reversed(self_play_history):
-                    env._agent.give_reward(
-                        old_relative_obs=old_relative_obs,
-                        action=action,
-                        new_relative_obs=new_relative_obs,
-                        reward=reward)
+                for item in self_play_history.sample(n=None):
+                    env._agent.give_reward(item=item)
                 env.reset()
-                self_play_history = []
                 if (not args.real_time) and (game_num % 10 == 0):
                     env._agent.save(checkpoint='agent.pkl')
                 if game_num == args.num_games:

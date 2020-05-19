@@ -7,6 +7,7 @@ import numpy as np
 import pygame
 
 from gfootball.common.colors import RED
+from gfootball.common.history import HistoryItem
 from gfootball.common.writer import Writer, write_text_on_frame
 from gfootball.env import football_action_set
 from gfootball.env import player_base
@@ -478,24 +479,23 @@ class Player(player_base.PlayerBase):
     # def set_action(self, action):
     #     self._action = action
 
-    def give_reward(self, old_relative_obs, action, new_relative_obs, reward):
+    def give_reward(self, item):
+        assert isinstance(item, HistoryItem), item
         # assert isinstance(old_state,)
         assert self._last_action is not None
-        old_state = self.get_state(observations=old_relative_obs)
-        new_state = self.get_state(observations=new_relative_obs)
+        old_state = self.get_state(observations=item.old_state)
+        new_state = self.get_state(observations=item.new_state)
         possible_actions_dict = self.Q[new_state]
         best_action_value = max(possible_actions_dict.values()) if possible_actions_dict else 0
         # best_action_value = self.q.get_v_value(state=new_state)
         # self.q.add(state=old_state, action=action, reward=reward.item() + discount * best_action_value)
-        alpha = 0.0001
+        alpha = 1e-5
         discount = 0.999
-        self.Q[old_state][action] = (
-            (1.0 - alpha) * self.Q[old_state][action] +
-            alpha * (reward.item() + discount * best_action_value)
+        self.Q[old_state][item.action] = (
+            (1.0 - alpha) * self.Q[old_state][item.action] +
+            alpha * (item.reward + discount * best_action_value)
         )
-        assert isinstance(self.Q[old_state][action], float), self.Q[old_state][action]
-        # if reward.item() != 0:
-        #     assert 0, 'TODO'
+        assert isinstance(self.Q[old_state][item.action], float), self.Q[old_state][item.action]
 
     def take_action(self, observations):
         if not self._init_done:
