@@ -67,7 +67,7 @@ def main():
     obs_history = [
         env.reset(),  # Need this to know the initial state
     ]
-    self_play_history = History(max_size=100000)
+    self_play_history = History(max_size=int(1e7))
     running_score_update = 0.999
     running_score = [0, 0, 0]
     record = [0, 0, 0]
@@ -110,7 +110,7 @@ def main():
                     'Final Score:', score,
                     'Running score: [%.3f, %.3f, %.3f]' % tuple([x / (1 - running_score_update ** game_num) for x in running_score]),
                     'Record:', record)
-                for item in self_play_history.sample(n=None):
+                for item in self_play_history.sample(n=int(1e5)):
                     env._agent.give_reward(item=item)
                 env.reset()
                 if (not args.real_time) and (game_num % 10 == 0):
