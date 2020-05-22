@@ -3,6 +3,7 @@ import pickle
 import random
 from collections import defaultdict, namedtuple
 
+import copy
 import numpy as np
 import pygame
 
@@ -36,7 +37,8 @@ class Player(player_base.PlayerBase):
             self.writer = None
 
         self._prev_state = None
-        self.Q = defaultdict(lambda: defaultdict(float))
+        self.Q1 = defaultdict(lambda: defaultdict(float))
+        self.Q2 = defaultdict(lambda: defaultdict(float))
         # self._state_values = defaultdict(float)
         # self._transitions_counts = defaultdict(lambda : defaultdict(int))
 
@@ -45,24 +47,34 @@ class Player(player_base.PlayerBase):
 
         # self._action = None
 
-    def load(self, checkpoint):
-        with open(checkpoint, 'rb') as inf:
-            Q = pickle.load(inf)
+    def _load_single_Q(self, Q_json, Q):
         n = 0
-        for state, action_values_dict in Q.items():
+        for state, action_values_dict in Q_json.items():
             for action, value in action_values_dict.items():
                 if value != 0.0:
                     # print('LOADED:', state, action, value)
-                    self.Q[state][action] = value
+                    Q[state][action] = value
                     n += 1
         print('Loaded %d Q values.' % n)
+        return Q
+
+    def load(self, checkpoint):
+        with open(checkpoint, 'rb') as inf:
+            QS = pickle.load(inf)
+        self.Q1 = self._load_single_Q(Q_json=QS['Q1'], Q=defaultdict(lambda: defaultdict(float)))
+        self.Q2 = self._load_single_Q(Q_json=QS['Q2'], Q=defaultdict(lambda: defaultdict(float)))
 
     def save(self, checkpoint):
-        Q = {k: {k2: v2 for k2, v2 in v.items() if v2 != 0.0} for k, v in self.Q.items()}
-        n = sum([len(v) for v in Q.values()])
+        Q1 = {k: {k2: v2 for k2, v2 in v.items() if v2 != 0.0} for k, v in self.Q1.items()}
+        Q2 = {k: {k2: v2 for k2, v2 in v.items() if v2 != 0.0} for k, v in self.Q2.items()}
+        n1 = sum([len(v) for v in Q1.values()])
+        n2 = sum([len(v) for v in Q2.values()])
         with open(checkpoint, 'wb') as f:
-            pickle.dump(Q, f)
-        print('Saved %d Q values.' % n)
+            pickle.dump({
+                'Q1': Q1,
+                'Q2': Q2,
+            }, f)
+        print('Saved %d Q1 values, and %d Q2 values.' % (n1, n2))
 
     def _object_distance(self, object1, object2):
         '''Computes distance between two objects.'''
@@ -485,17 +497,39 @@ class Player(player_base.PlayerBase):
         assert self._last_action is not None
         old_state = self.get_state(observations=item.old_state)
         new_state = self.get_state(observations=item.new_state)
-        possible_actions_dict = self.Q[new_state]
+        # Use Double Estimated SARSA
+        # "Double" removes bias, and "Estimated" removes variance.
+        if random.random() < 0.5:
+            Q1 = self.Q1
+            Q2 = self.Q2
+        else:
+            Q1 = self.Q2
+            Q2 = self.Q1
+        possible_actions_dict = Q1[new_state]
         best_action_value = max(possible_actions_dict.values()) if possible_actions_dict else 0
-        # best_action_value = self.q.get_v_value(state=new_state)
-        # self.q.add(state=old_state, action=action, reward=reward.item() + discount * best_action_value)
-        alpha = 1e-5
+        probs_by_action = {
+            action: self.random_frac / len(DEFAULT_ACTION_SET)
+            for action in DEFAULT_ACTION_SET
+        }
+        list_of_best_actions = []
+        for action in DEFAULT_ACTION_SET:
+            value = possible_actions_dict[action]
+            if value == best_action_value:
+                list_of_best_actions.append(action)
+        assert list_of_best_actions
+        for action in list_of_best_actions:
+            probs_by_action[action] += (1 - self.random_frac) / len(list_of_best_actions)
+        expected_sarsa_state_value = 0.0
+        for action, prob in probs_by_action.items():
+            # Q2 is only used here to estimate the state value, after the state probs have been chosen by Q1
+            expected_sarsa_state_value += prob * Q2[new_state][action]
+        alpha = 1e-4
         discount = 0.999
-        self.Q[old_state][item.action] = (
-            (1.0 - alpha) * self.Q[old_state][item.action] +
-            alpha * (item.reward + discount * best_action_value)
+        Q1[old_state][item.action] = (
+            (1.0 - alpha) * Q1[old_state][item.action] +
+            alpha * (item.reward + discount * expected_sarsa_state_value)
         )
-        assert isinstance(self.Q[old_state][item.action], float), self.Q[old_state][item.action]
+        assert isinstance(Q1[old_state][item.action], float), Q1[old_state][item.action]
 
     def take_action(self, observations):
         if not self._init_done:
@@ -531,7 +565,11 @@ class Player(player_base.PlayerBase):
             action = self._get_action(debug=debug)
             debug.append(('Warmstart action:', action))
         else:
-            possible_actions_dict = self.Q[state]
+            if random.random() < 0.5:
+                Q = self.Q1
+            else:
+                Q = self.Q2
+            possible_actions_dict = Q[state]
             if (not possible_actions_dict) or (random.random() < self.random_frac):
                 action = DEFAULT_ACTION_SET[random.randint(0, len(DEFAULT_ACTION_SET) - 1)]
                 if self.verbose:
@@ -605,7 +643,6 @@ class BasicState(namedtuple('BasicState', [
 #             # 'player_ppo2_cnn': 0,
 #             'left_players': 1,
 #             'right_players': 0,
-#             # 'checkpoint': checkpoint,
 #         },
 #         env_config = {
 #             'action_set': 'default',
@@ -613,22 +650,28 @@ class BasicState(namedtuple('BasicState', [
 #             'warmstart': False,
 #             'random_frac': 0.0,
 #             'verbose': False,
+#             'video': None,
 #         })
-#     agent.load(checkpoint='agents/agent_3v3_0.5_13.pkl')
+#     agent.load(checkpoint='agents/agent_3v3_0.5_33.pkl')
 #     Q = {}
 #
 #     n = 0
+#     n_values = 0
+#     sum_values = 0
 #     for state, action_values_dict in agent.Q.items():
-#         state1 = state._replace(role=e_PlayerRole_CB)
-#         state2 = state._replace(role=e_PlayerRole_CF)
-#         Q[state1] = {}
-#         Q[state2] = {}
-#         for action, value in action_values_dict.items():
-#             if value != 0.0:
-#                 # print('LOADED:', state, action, value)
-#                 Q[state1][action] = value
-#                 Q[state2][action] = value
-#                 n += 2
-#     print(n)
-#     agent.Q = Q
-#     agent.save(checkpoint='agents/agent_3v3_0.5_14.pkl')
+#         value = max(action_values_dict.values())
+#         n_values += 1
+#         sum_values += value
+#         # state1 = state._replace(reward=)
+#         # state2 = state._replace(role=e_PlayerRole_CF)
+#         # Q[state1] = {}
+#         # Q[state2] = {}
+#         # for action, value in action_values_dict.items():
+#         #     if value != 0.0:
+#         #         # print('LOADED:', state, action, value)
+#         #         Q[state1][action] = value
+#         #         Q[state2][action] = value
+#         #         n += 2
+#     print(sum_values / n_values)
+#     # agent.Q = Q
+#     # agent.save(checkpoint='agents/agent_3v3_0.5_14.pkl')

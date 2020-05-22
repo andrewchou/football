@@ -1,7 +1,5 @@
 import argparse
 import logging
-import random
-from collections import defaultdict, namedtuple
 
 from gfootball.common.history import History, HistoryItem
 from gfootball.env import config
@@ -86,7 +84,6 @@ def main():
                 new_state=obs,
                 reward=reward.item(),
             )
-            env._agent.give_reward(item=item)
             self_play_history.add(item=item)
             # cnts_by_mode[(obs[0]['game_mode'], obs[0]['ball_owned_team'])] += 1
             obs_history.append(obs)
@@ -106,14 +103,18 @@ def main():
                     record[2] += 1
                 else:
                     record[1] += 1
+                # mean_reward = self_play_history.mean_reward()
                 print(
                     'Final Score:', score,
-                    'Running score: [%.3f, %.3f, %.3f]' % tuple([x / (1 - running_score_update ** game_num) for x in running_score]),
-                    'Record:', record)
-                for item in self_play_history.sample(n=int(1e5)):
-                    env._agent.give_reward(item=item)
+                    'Running score: [%.3f, %.3f, %.3f]' % tuple(
+                        [x / (1 - running_score_update ** game_num) for x in running_score]),
+                    'Record:', record,
+                    # 'Mean Reward in history:', mean_reward,
+                )
+                for item in self_play_history.sample(n=int(1e3)):
+                    env._agent.give_reward(item=item) # ._replace(reward=item.reward - mean_reward))
                 env.reset()
-                if (not args.real_time) and (game_num % 10 == 0):
+                if (not args.real_time) and (game_num % 25 == 0):
                     env._agent.save(checkpoint='agent.pkl')
                 if game_num == args.num_games:
                     break
@@ -128,3 +129,4 @@ def main():
 if __name__ == '__main__':
     # app.run(main)
     main()
+    # update_states()

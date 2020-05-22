@@ -1,6 +1,8 @@
 import random
 from collections import namedtuple
 
+import numpy as np
+
 class HistoryItem(namedtuple('HistoryItem', [
     'old_state', 'action', 'new_state', 'reward',
 ])):
@@ -26,3 +28,6 @@ class History():
             random.shuffle(all_history)
             return all_history
         return random.sample(population=self.history, k=min(n, len(self.history)))
+
+    def mean_reward(self):
+        return np.mean([item.reward for item in self.history])
