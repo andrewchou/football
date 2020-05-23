@@ -13,252 +13,20 @@ from gfootball.common.writer import Writer, write_text_on_frame
 from gfootball.env import football_action_set
 from gfootball.env import player_base
 from gfootball.env.football_action_set import DEFAULT_ACTION_SET
+from gfootball.env.players.base_rl_agent import BaseRLPlayer
+from gfootball.policies.double_expected_sarsa import DoubleExpectedSarsa
 from gfootball.scenarios import e_PlayerRole_GK, e_PlayerRole_CB, e_PlayerRole_CF
 from third_party import gfootball_engine
 
-class Player(player_base.PlayerBase):
-
+class Player(BaseRLPlayer):
     def __init__(self, player_config, env_config):
-        assert env_config['action_set'] == 'default'
-        self.pitch_scale = env_config['pitch_scale']
-        assert self.pitch_scale in (1.0, 0.5), self.pitch_scale
-        player_base.PlayerBase.__init__(self, player_config)
-        self._observation = None
-        self._last_action = football_action_set.action_idle
-        self._pressure_enabled = False
+        super().__init__(player_config=player_config, env_config=env_config)
 
-        self._warmstart = env_config['warmstart']
-        assert isinstance(self._warmstart, bool)
-        self.random_frac = env_config['random_frac']
-        self.verbose = env_config['verbose']
-        if env_config['video']:
-            self.writer = Writer(filename=env_config['video'])
-        else:
-            self.writer = None
-
-        self._prev_state = None
-        self.Q1 = defaultdict(lambda: defaultdict(float))
-        self.Q2 = defaultdict(lambda: defaultdict(float))
-        # self._state_values = defaultdict(float)
-        # self._transitions_counts = defaultdict(lambda : defaultdict(int))
-
-        pygame.init()
-        self._init_done = False
-
-        # self._action = None
-
-    def _load_single_Q(self, Q_json, Q):
-        n = 0
-        for state, action_values_dict in Q_json.items():
-            for action, value in action_values_dict.items():
-                if value != 0.0:
-                    # print('LOADED:', state, action, value)
-                    Q[state][action] = value
-                    n += 1
-        print('Loaded %d Q values.' % n)
-        return Q
-
-    def load(self, checkpoint):
-        with open(checkpoint, 'rb') as inf:
-            QS = pickle.load(inf)
-        self.Q1 = self._load_single_Q(Q_json=QS['Q1'], Q=defaultdict(lambda: defaultdict(float)))
-        self.Q2 = self._load_single_Q(Q_json=QS['Q2'], Q=defaultdict(lambda: defaultdict(float)))
-
-    def save(self, checkpoint):
-        Q1 = {k: {k2: v2 for k2, v2 in v.items() if v2 != 0.0} for k, v in self.Q1.items()}
-        Q2 = {k: {k2: v2 for k2, v2 in v.items() if v2 != 0.0} for k, v in self.Q2.items()}
-        n1 = sum([len(v) for v in Q1.values()])
-        n2 = sum([len(v) for v in Q2.values()])
-        with open(checkpoint, 'wb') as f:
-            pickle.dump({
-                'Q1': Q1,
-                'Q2': Q2,
-            }, f)
-        print('Saved %d Q1 values, and %d Q2 values.' % (n1, n2))
-
-    def _object_distance(self, object1, object2):
-        '''Computes distance between two objects.'''
-        return np.linalg.norm(np.array(object1) - np.array(object2))
-
-    def _direction_action(self, delta):
-        '''For required movement direction vector returns appropriate action.'''
-        all_directions = [
-            football_action_set.action_top,
-            football_action_set.action_top_left,
-            football_action_set.action_left,
-            football_action_set.action_bottom_left,
-            football_action_set.action_bottom,
-            football_action_set.action_bottom_right,
-            football_action_set.action_right,
-            football_action_set.action_top_right
-        ]
-        all_directions_vec = [
-            (0, -1), (-1, -1), (-1, 0), (-1, 1),
-            (0, 1), (1, 1), (1, 0), (1, -1)]
-        all_directions_vec = [
-            np.array(v) / np.linalg.norm(np.array(v)) for v in all_directions_vec
-        ]
-        best_direction = np.argmax([np.dot(delta, v) for v in all_directions_vec])
-        action = all_directions[best_direction]
-        # TODO
-        # if (self._last_action == action): # or (self._last_action == football_action_set.action_sprint):
-        #     return football_action_set.action_idle
-        return action
-
-    def _closest_opponent_to_object(self, o):
-        '''For a given object returns the closest opponent.
-
-        Args:
-          o: Source object.
-
-        Returns:
-          Closest opponent.'''
-        min_d = None
-        closest = None
-        for p in self._observation['right_team']:
-            d = self._object_distance(o, p)
-            if min_d is None or d < min_d:
-                min_d = d
-                closest = p
-        assert closest is not None
-        return closest
-
-    def _closest_team_member_index_to_object(self, o):
-        '''For a given object returns the closest team member index.
-
-        Args:
-          o: Source object.
-
-        Returns:
-          Closest opponent.'''
-        min_d = None
-        closest_i = None
-        for i, p in enumerate(self._observation['left_team']):
-            d = self._object_distance(o, p)
-            if ((min_d is None) or (d < min_d)) and (self._get_role(index=i) != e_PlayerRole_GK):
-                min_d = d
-                closest_i = i
-        assert closest_i is not None
-        return closest_i
-
-    def _closest_team_member_index_to_opponent_with_ball(self):
-        return self._closest_team_member_index_to_object(o=self._get_ball_owner_location())
-
-    def _am_closest_team_member_to_opponent_with_ball(self):
-        return self._closest_team_member_index_to_object(self._get_ball_owner_location()) == self._get_own_index()
-
-    def _closest_front_opponent(self, o, target):
-        '''For an object and its movement direction returns the closest opponent.
-
-        Args:
-          o: Source object.
-          target: Movement direction.
-
-        Returns:
-          Closest front opponent.'''
-        delta = target - o
-        min_d = None
-        closest = None
-        for p in self._observation['right_team']:
-            delta_opp = p - o
-            if np.dot(delta, delta_opp) <= 0:
-                continue
-            d = self._object_distance(o, p)
-            if min_d is None or d < min_d:
-                min_d = d
-                closest = p
-
-        # May return None!
-        return closest
-
-    def _score_pass_target(self, active, player):
-        '''Computes score of the pass between players.
-
-        Args:
-          active: Player doing the pass.
-          player: Player receiving the pass.
-
-        Returns:
-          Score of the pass.
-        '''
-        opponent = self._closest_opponent_to_object(player)
-        dist = self._object_distance(player, opponent)
-        trajectory = player - active
-        dist_closest_traj = None
-        for i in range(10):
-            position = active + (i + 1) / 10.0 * trajectory
-            opp_traj = self._closest_opponent_to_object(position)
-            dist_traj = self._object_distance(position, opp_traj)
-            if dist_closest_traj is None or dist_traj < dist_closest_traj:
-                dist_closest_traj = dist_traj
-        return -dist_closest_traj
-
-    def _best_pass_player_position(self, active):
-        '''Computes best pass a given player can do.
-
-        Args:
-          active: Player doing the pass.
-
-        Returns:
-          Best target player receiving the pass.
-        '''
-        best_score = None
-        best_target = None
-        for player in self._observation['left_team']:
-            if self._object_distance(player, active) > 0.3:
-                continue
-            score = self._score_pass_target(active, player)
-            if best_score is None or score > best_score:
-                best_score = score
-                best_target = player
-        return best_target
-
-    def _avoid_opponent(self, active, opponent, target):
-        '''Computes movement action to avoid a given opponent.
-
-        Args:
-          active: Active player.
-          opponent: Opponent to be avoided.
-          target: Original movement direction of the active player.
-
-        Returns:
-          Action to perform to avoid the opponent.
-        '''
-        # Choose a perpendicular direction to the opponent, towards the target.
-        delta = opponent - active
-        delta_t = target - active
-        new_delta = [delta[1], -delta[0]]
-        if delta_t[0] * new_delta[0] < 0:
-            new_delta = [-new_delta[0], -new_delta[1]]
-
-        return self._direction_action(new_delta)
-
-    def _get_ball_location(self):
-        return self._observation['ball'][:2]
-
-    def _get_ball_owner_location(self):
-        assert self._observation['ball_owned_team'] == 1, self._observation
-        other_team_positions = self._observation['right_team']
-        other_player_with_ball_position = other_team_positions[self._observation['ball_owned_player']]
-        return other_player_with_ball_position
-
-    def _get_ball_owner_location_target(self):
-        return self._get_ball_owner_location() - self._get_own_position()
-
-    def _get_own_position(self):
-        return self._observation['left_team'][self._get_own_index()]
-
-    def _they_have_the_ball(self):
-        return self._observation['ball_owned_team'] == 1
-
-    def _we_have_the_ball(self):
-        return self._observation['ball_owned_team'] == 0
-
-    def _get_sticky_actions(self):
-        return self._observation['sticky_actions']
-
-    def _get_own_index(self):
-        return self._observation['active']
+    def get_policy(self, player_config):
+        return DoubleExpectedSarsa(
+            random_frac=player_config['random_frac'], checkpoint=player_config['checkpoint'],
+            verbose=player_config['verbose'],
+        )
 
     def _get_assigned_opponent_to_defend_target(self):
         assert self._observation['ball_owned_team'] == 1, self._observation
@@ -273,7 +41,7 @@ class Player(player_base.PlayerBase):
             other_player_with_ball_position = other_team_positions[3 - ball_owner_index]
         return other_player_with_ball_position - self._get_own_position()
 
-    def _get_action(self, debug):
+    def _get_hardcoded_action(self, debug):
         '''Returns action to perform for the current observations.'''
         own_position = self._get_own_position()
         # Corner etc. - just pass the ball
@@ -344,59 +112,6 @@ class Player(player_base.PlayerBase):
                     return direction_action
         return move_action
 
-    def _opponent_angle_bucket_relative_to_me(self):
-        position = self._get_own_position()
-        opponent = self._closest_opponent_to_object(o=position)
-        return self._angle_bucket_relative_to_me(other_position=opponent)
-
-    def _ball_angle_bucket_relative_to_me(self):
-        return self._angle_bucket_relative_to_me(other_position=self._get_ball_location())
-
-    def _angle_bucket_relative_to_me(self, other_position):
-        position = self._get_own_position()
-        delta = other_position - position
-        # Angle in radians, in the range [-pi, pi].
-        radians = np.arctan2(delta[1], delta[0])
-        degrees = radians * 180 / np.pi
-        assert -180 <= degrees <= 180, degrees
-        degrees_plus_210 = degrees + 210  # [30, 390]
-        assert 30 <= degrees_plus_210 <= 390, degrees_plus_210
-        wrapped_degrees_plus_210 = degrees_plus_210 % 360
-        assert 0 <= wrapped_degrees_plus_210 <= 360, wrapped_degrees_plus_210
-        bucket = wrapped_degrees_plus_210 // 60  #
-        if bucket == 6:
-            assert wrapped_degrees_plus_210 == 360, wrapped_degrees_plus_210
-            bucket = 5
-        assert 0 <= bucket <= 5, bucket
-        bucket = (bucket + 3) % 6
-        # print('BUCKET')
-        # print(position)
-        # print(opponent)
-        # print(delta)
-        # print(degrees)
-        # print(bucket)
-        assert int(bucket) == bucket, bucket
-        return int(bucket)
-
-    def _opponent_distance_from_me(self):
-        position = self._get_own_position()
-        opponent = self._closest_opponent_to_object(o=position)
-        return self._object_distance(object1=position, object2=opponent)
-
-    def _ball_distance_from_me(self):
-        position = self._get_own_position()
-        return self._object_distance(object1=position, object2=self._get_ball_location())
-
-    def _am_offside(self):
-        own_pos = self._get_own_position()
-        num_opponents_closer_to_their_goal = 0
-        for opponent_pos in self._observation['right_team']:
-            if own_pos[0] < opponent_pos[0]:
-                num_opponents_closer_to_their_goal += 1
-        return bool(
-            (num_opponents_closer_to_their_goal < 2) and (own_pos[0] > 0)
-        )
-
     def _get_teammate_position(self):
         active_index = self._get_own_index()
         assert active_index in [1, 2], active_index
@@ -411,11 +126,6 @@ class Player(player_base.PlayerBase):
         return bool(
             (num_opponents_closer_to_their_goal < 2) and (teammate_pos[0] > 0)
         )
-
-    def _get_role(self, index=None):
-        if index is None:
-            index = self._get_own_index()
-        return int(self._observation['left_team_roles'][index])
 
     def get_state(self, observations):
         assert len(observations) == 1, len(observations)
@@ -487,115 +197,6 @@ class Player(player_base.PlayerBase):
             teammate_offside=self._teammate_offside(),
             role=self._get_role(),
         )
-
-    # def set_action(self, action):
-    #     self._action = action
-
-    def give_reward(self, item):
-        assert isinstance(item, HistoryItem), item
-        # assert isinstance(old_state,)
-        assert self._last_action is not None
-        old_state = self.get_state(observations=item.old_state)
-        new_state = self.get_state(observations=item.new_state)
-        # Use Double Estimated SARSA
-        # "Double" removes bias, and "Estimated" removes variance.
-        if random.random() < 0.5:
-            Q1 = self.Q1
-            Q2 = self.Q2
-        else:
-            Q1 = self.Q2
-            Q2 = self.Q1
-        possible_actions_dict = Q1[new_state]
-        best_action_value = max(possible_actions_dict.values()) if possible_actions_dict else 0
-        probs_by_action = {
-            action: self.random_frac / len(DEFAULT_ACTION_SET)
-            for action in DEFAULT_ACTION_SET
-        }
-        list_of_best_actions = []
-        for action in DEFAULT_ACTION_SET:
-            value = possible_actions_dict[action]
-            if value == best_action_value:
-                list_of_best_actions.append(action)
-        assert list_of_best_actions
-        for action in list_of_best_actions:
-            probs_by_action[action] += (1 - self.random_frac) / len(list_of_best_actions)
-        expected_sarsa_state_value = 0.0
-        for action, prob in probs_by_action.items():
-            # Q2 is only used here to estimate the state value, after the state probs have been chosen by Q1
-            expected_sarsa_state_value += prob * Q2[new_state][action]
-        alpha = 1e-4
-        discount = 0.999
-        Q1[old_state][item.action] = (
-            (1.0 - alpha) * Q1[old_state][item.action] +
-            alpha * (item.reward + discount * expected_sarsa_state_value)
-        )
-        assert isinstance(Q1[old_state][item.action], float), Q1[old_state][item.action]
-
-    def take_action(self, observations):
-        if not self._init_done:
-            self._init_done = True
-            pygame.display.set_mode((1, 1), pygame.NOFRAME)
-        assert len(observations) == 1, 'Bot does not support multiple player control'
-        if self.verbose: print()
-
-        # print('OBS')
-        # for k, v in sorted(observations[0].items()):
-        #     if k != 'frame':
-        #         print(k, v)
-        self._observation = observations[0]
-        state = self.get_state(observations=observations)
-        if self.writer:
-            frame = self._observation['frame'][:, :, [2, 1, 0]].copy()
-            for i, (k, v) in enumerate(sorted(state._asdict().items())):
-                write_text_on_frame(
-                    frame=frame, text='%s: %s' % (k, v),
-                    color=RED, bottom_left_corner_of_text=(30, 20 * (i + 2)),
-                    thickness=1, font_scale=0.5)
-            for i, (k, v) in enumerate(sorted(self._observation.items())):
-                if k == 'frame':
-                    continue
-                write_text_on_frame(
-                    frame=frame, text='%s: %s' % (k, v),
-                    color=RED, bottom_left_corner_of_text=(360, 20 * (i + 2)),
-                    thickness=1, font_scale=0.5)
-        if self.verbose:
-            print(state)
-        debug = []
-        if self._warmstart:
-            action = self._get_action(debug=debug)
-            debug.append(('Warmstart action:', action))
-        else:
-            if random.random() < 0.5:
-                Q = self.Q1
-            else:
-                Q = self.Q2
-            possible_actions_dict = Q[state]
-            if (not possible_actions_dict) or (random.random() < self.random_frac):
-                action = DEFAULT_ACTION_SET[random.randint(0, len(DEFAULT_ACTION_SET) - 1)]
-                if self.verbose:
-                    debug.append(('Random action:', action))
-            else:
-                assert possible_actions_dict
-                for a in DEFAULT_ACTION_SET:
-                    if a not in possible_actions_dict:
-                        possible_actions_dict[a] = 0.0
-                best_value = max(possible_actions_dict.values())
-                top_actions = [a for a in DEFAULT_ACTION_SET if possible_actions_dict[a] == best_value]
-                action = top_actions[random.randint(0, len(top_actions) - 1)]
-                debug.append((' Value action:', action, best_value, min(possible_actions_dict.values())))
-                assert isinstance(best_value, float)
-        if self.writer:
-            for i, x in enumerate(debug):
-                write_text_on_frame(
-                    frame=frame, text=str(x),
-                    color=RED, bottom_left_corner_of_text=(20, 720 - 20 * (len(debug) - i)),
-                    thickness=1, font_scale=0.5)
-            self.writer.write(frame=frame)
-        self._last_action = action
-        # self._prev_state = cur_state
-        # assert self._last_action in ACTION_SET_DICT['default'], self._last_action
-        # print(self._last_action)
-        return [self._last_action]
 
 class BasicState(namedtuple('BasicState', [
     'ball_owned_team',  # 3

@@ -1,8 +1,9 @@
 import argparse
 import logging
 
+from gfootball.env.config import Config
+
 from gfootball.common.history import History, HistoryItem
-from gfootball.env import config
 from gfootball.env import football_env
 
 def bool_arg(x):
@@ -44,28 +45,29 @@ def main():
     players = args.players.split(';') if args.players else ''
     # assert not (any(['agent' in player for player in players])
     #             ), ('Player type \'agent\' can not be used with play_game.')
-    cfg = config.Config({
+    config = Config({
         'action_set': args.action_set,
         'dump_full_episodes': True,
         'players': players,
         'real_time': args.real_time and args.render,
         'pitch_scale': args.pitch_scale,
+    })
+    base_player_config = {
+        'checkpoint': args.checkpoint,
         'warmstart': args.warmstart,
         'random_frac': args.random_frac,
         'verbose': args.verbose,
         'video': args.video,
-    })
+    }
     if args.level:
-        cfg['level'] = args.level
-    env = football_env.FootballEnv(cfg)
-    if args.checkpoint:
-        env._agent.load(checkpoint=args.checkpoint)
+        config['level'] = args.level
+    env = football_env.FootballEnv(config=config, base_player_config=base_player_config)
     if args.render:
         env.render()
     obs_history = [
         env.reset(),  # Need this to know the initial state
     ]
-    self_play_history = History(max_size=int(1e7))
+    # self_play_history = History(max_size=int(1e7))
     running_score_update = 0.999
     running_score = [0, 0, 0]
     record = [0, 0, 0]
@@ -84,7 +86,8 @@ def main():
                 new_state=obs,
                 reward=reward.item(),
             )
-            self_play_history.add(item=item)
+            env._agent.give_reward(item=item)
+            # self_play_history.add(item=item)
             # cnts_by_mode[(obs[0]['game_mode'], obs[0]['ball_owned_team'])] += 1
             obs_history.append(obs)
             if args.verbose:
@@ -111,8 +114,8 @@ def main():
                     'Record:', record,
                     # 'Mean Reward in history:', mean_reward,
                 )
-                for item in self_play_history.sample(n=int(1e3)):
-                    env._agent.give_reward(item=item) # ._replace(reward=item.reward - mean_reward))
+                # for item in self_play_history.sample(n=int(1e3)):
+                #     env._agent.give_reward(item=item) # ._replace(reward=item.reward - mean_reward))
                 env.reset()
                 if (not args.real_time) and (game_num % 25 == 0):
                     env._agent.save(checkpoint='agent.pkl')

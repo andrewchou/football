@@ -46,18 +46,20 @@ PLAYERS_BY_NAME = {
 class FootballEnv(gym.Env):
     """Allows multiple players to play in the same environment."""
 
-    def __init__(self, config):
+    def __init__(self, config, base_player_config=None):
         self._config = config
         player_config = {
             'index': 0,
         }
+        if base_player_config:
+            player_config.update(base_player_config)
         # There can be at most one agent at a time. We need to remember its
         # team and the index on the team to generate observations appropriately.
         self._agent = None
         self._agent_index = -1
         self._agent_left_position = -1
         self._agent_right_position = -1
-        self._players = self._construct_players(config['players'], player_config)
+        self._players = self._construct_players(definitions=config['players'], base_player_config=player_config)
         self._env = football_env_core.FootballEnvCore(self._config)
         self._num_actions = len(football_action_set.get_action_set(self._config))
         self._cached_observation = None
@@ -69,24 +71,24 @@ class FootballEnv(gym.Env):
                 [self._num_actions] * self._config.number_of_players_agent_controls())
         return gym.spaces.Discrete(self._num_actions)
 
-    def _construct_players(self, definitions, config):
+    def _construct_players(self, definitions, base_player_config):
         result = []
         left_position = 0
         right_position = 0
         for definition in definitions:
             (name, d) = cfg.parse_player_definition(definition)
             config_name = 'player_{}'.format(name)
-            if config_name in config:
-                config[config_name] += 1
+            if config_name in base_player_config:
+                base_player_config[config_name] += 1
             else:
-                config[config_name] = 0
+                base_player_config[config_name] = 0
             if name in PLAYERS_BY_NAME:
                 player_class = PLAYERS_BY_NAME[name]
             else:
                 assert 0, 'Unknown player class: %s. Choose from: %s' % (name, sorted(PLAYERS_BY_NAME))
-            player_config = copy.deepcopy(config)
+            player_config = copy.deepcopy(base_player_config)
             player_config.update(d)
-            if 'checkpoint' in player_config:
+            if ('checkpoint' in player_config) and (player_config['checkpoint'] is not None):
                 player_config['checkpoint'] = expanduser(player_config['checkpoint'])
             player = player_class(player_config=player_config, env_config=self._config)
             if name.startswith('agent_'):
@@ -98,7 +100,7 @@ class FootballEnv(gym.Env):
             result.append(player)
             left_position += player.num_controlled_left_players()
             right_position += player.num_controlled_right_players()
-            config['index'] += 1
+            base_player_config['index'] += 1
         return result
 
     def _convert_observations(

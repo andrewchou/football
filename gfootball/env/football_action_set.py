@@ -127,7 +127,7 @@ action_release_dribble = CoreAction(e_BackendAction.release_dribble,
 # ***** Define some action sets *****
 
 # Special action set that includes all the core actions in the same order.
-FULL_ACTION_SET = [
+FULL_ACTION_SET = tuple([
     action_idle, action_left, action_top_left, action_top,
     action_top_right, action_right, action_bottom_right,
     action_bottom, action_bottom_left, action_long_pass,
@@ -141,8 +141,8 @@ FULL_ACTION_SET = [
     action_release_pressure, action_release_team_pressure,
     action_release_switch, action_release_sprint,
     action_release_dribble
-]
-DEFAULT_ACTION_SET = [
+])
+DEFAULT_ACTION_SET = tuple([
     action_idle,
     action_left,
     action_top_left,
@@ -162,7 +162,7 @@ DEFAULT_ACTION_SET = [
     action_sliding,
     action_dribble,
     action_release_dribble,
-]
+])
 
 ACTION_SET_DICT = {
     # "full" action set is needed by the play_game script.
