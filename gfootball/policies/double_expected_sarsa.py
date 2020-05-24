@@ -87,6 +87,11 @@ class DoubleExpectedSarsa():
         )
         assert isinstance(Q1[old_state][item.action], float), Q1[old_state][item.action]
 
+    def process_epoch(self, items):
+        # reverse so that reward can propogate backward faster
+        for item in reversed(items):
+            self.give_reward(item=item)
+
     def get_action(self, state, debug=None):
         possible_actions_dict1 = self.Q1[state]
         possible_actions_dict2 = self.Q2[state]

@@ -19,3 +19,4 @@ cmake-build-debug/
 *.txt
 *.pkl
 *.mp4
+*.npz

@@ -1,10 +1,14 @@
 import argparse
 import logging
 
+import os
+
 from gfootball.env.config import Config
 
 from gfootball.common.history import History, HistoryItem
 from gfootball.env import football_env
+from gfootball.env.football_action_set import DEFAULT_ACTION_SET
+from gfootball.policies.base_policy import PolicyConfig, PolicyType
 
 def bool_arg(x):
     try:
@@ -37,14 +41,16 @@ def parse_args():
     parser.add_argument('--random_frac', type=float, default=0.1, help='')
     parser.add_argument('--video', type=str, default='', help='')
     parser.add_argument('--num_games', type=int, default=1000000000, help='')
+    parser.add_argument('--lr', type=float, default=1e-4, help='')
+    parser.add_argument('--policy_type', type=PolicyType, default=PolicyType.Q_LEARNING, help='')
+    parser.add_argument('--n_steps', type=int, default=50, help='')
+    parser.add_argument('--discount', type=float, default=0.999, help='')
     args = parser.parse_args()
     return args
 
 def main():
     args = parse_args()
-    players = args.players.split(';') if args.players else ''
-    # assert not (any(['agent' in player for player in players])
-    #             ), ('Player type \'agent\' can not be used with play_game.')
+    players = args.players.split(';')
     config = Config({
         'action_set': args.action_set,
         'dump_full_episodes': True,
@@ -53,14 +59,24 @@ def main():
         'pitch_scale': args.pitch_scale,
     })
     base_player_config = {
-        'checkpoint': args.checkpoint,
+        'policy_config': PolicyConfig(
+            policy_type=args.policy_type,
+            checkpoint=args.checkpoint,
+            random_frac=args.random_frac,
+            action_set=DEFAULT_ACTION_SET,
+            lr=args.lr,
+            discount=args.discount,
+            n_steps=args.n_steps,
+            verbose=args.verbose,
+        ),
         'warmstart': args.warmstart,
-        'random_frac': args.random_frac,
         'verbose': args.verbose,
         'video': args.video,
     }
     if args.level:
         config['level'] = args.level
+    checkpoint = 'agents/' + args.policy_type.value.lower() + '/agent.npz'
+    assert not os.system('mkdir -p %s' % os.path.dirname(checkpoint))
     env = football_env.FootballEnv(config=config, base_player_config=base_player_config)
     if args.render:
         env.render()
@@ -73,6 +89,7 @@ def main():
     record = [0, 0, 0]
     try:
         game_num = 0
+        epoch_history = []
         # cnts_by_mode = defaultdict(int)
         while True:
             obs, reward, done, info = env.step()
@@ -86,7 +103,8 @@ def main():
                 new_state=obs,
                 reward=reward.item(),
             )
-            env._agent.give_reward(item=item)
+            epoch_history.append(item)
+            # env._agent.give_reward(item=item)
             # self_play_history.add(item=item)
             # cnts_by_mode[(obs[0]['game_mode'], obs[0]['ball_owned_team'])] += 1
             obs_history.append(obs)
@@ -116,17 +134,20 @@ def main():
                 )
                 # for item in self_play_history.sample(n=int(1e3)):
                 #     env._agent.give_reward(item=item) # ._replace(reward=item.reward - mean_reward))
-                env.reset()
+                env._agent.process_epoch(items=epoch_history)
+                obs_history.append(env.reset())
+                epoch_history = []
                 if (not args.real_time) and (game_num % 25 == 0):
-                    env._agent.save(checkpoint='agent.pkl')
+                    env._agent.save(checkpoint=checkpoint)
                 if game_num == args.num_games:
                     break
     except KeyboardInterrupt:
         logging.warning('Game stopped, writing dump...')
         if (not args.real_time):
             env._agent.save(checkpoint='agent.pkl')
-        env.write_dump('shutdown')
-        return env._agent
+        # env.write_dump('shutdown')
+        # return env._agent
+        print(checkpoint)
         exit(1)
 
 if __name__ == '__main__':

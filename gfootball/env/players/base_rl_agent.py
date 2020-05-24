@@ -1,9 +1,5 @@
 '''Sample bot player.'''
-import pickle
-import random
-from collections import defaultdict, namedtuple
 
-import copy
 import numpy as np
 import pygame
 
@@ -12,10 +8,11 @@ from gfootball.common.history import HistoryItem
 from gfootball.common.writer import Writer, write_text_on_frame
 from gfootball.env import football_action_set
 from gfootball.env import player_base
-from gfootball.env.football_action_set import DEFAULT_ACTION_SET
+from gfootball.policies.base_policy import PolicyConfig, PolicyType
 from gfootball.policies.double_expected_sarsa import DoubleExpectedSarsa
-from gfootball.scenarios import e_PlayerRole_GK, e_PlayerRole_CB, e_PlayerRole_CF
-from third_party import gfootball_engine
+from gfootball.policies.nstep_sarsa import NStepSarsa
+from gfootball.policies.q_learning import QLearning
+from gfootball.scenarios import e_PlayerRole_GK
 
 class BaseRLPlayer(player_base.PlayerBase):
     def __init__(self, player_config, env_config):
@@ -40,7 +37,18 @@ class BaseRLPlayer(player_base.PlayerBase):
         self._init_done = False
 
     def get_policy(self, player_config):
-        assert 0, 'TODO get_policy()'
+        policy_config = player_config['policy_config']
+        assert isinstance(policy_config, PolicyConfig), player_config
+        if policy_config.policy_type == PolicyType.Q_LEARNING:
+            return QLearning(policy_config=policy_config)
+        elif policy_config.policy_type == PolicyType.N_STEP_SARSA:
+            return NStepSarsa(policy_config=policy_config)
+        else:
+            assert 0, policy_config
+            # return DoubleExpectedSarsa(
+            #     random_frac=player_config['random_frac'], checkpoint=player_config['checkpoint'],
+            #     verbose=player_config['verbose'],
+            # )
 
     def load(self, checkpoint):
         self.policy.load(checkpoint=checkpoint)
@@ -305,12 +313,23 @@ class BaseRLPlayer(player_base.PlayerBase):
             new_state=self.get_state(observations=item.new_state),
         ))
 
+    def process_epoch(self, items):
+        new_items = []
+        for item in items:
+            assert isinstance(item, HistoryItem), item
+            new_items.append(item._replace(
+                old_state=self.get_state(observations=item.old_state),
+                new_state=self.get_state(observations=item.new_state),
+            ))
+        self.policy.process_epoch(items=new_items)
+
     def take_action(self, observations):
         if not self._init_done:
             self._init_done = True
             pygame.display.set_mode((1, 1), pygame.NOFRAME)
         assert len(observations) == 1, 'Bot does not support multiple player control'
-        if self.verbose: print()
+        if self.verbose:
+            print()
 
         # print('OBS')
         # for k, v in sorted(observations[0].items()):

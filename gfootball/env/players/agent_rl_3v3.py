@@ -1,32 +1,19 @@
 '''Sample bot player.'''
-import pickle
 import random
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 
-import copy
 import numpy as np
-import pygame
 
-from gfootball.common.colors import RED
-from gfootball.common.history import HistoryItem
-from gfootball.common.writer import Writer, write_text_on_frame
 from gfootball.env import football_action_set
-from gfootball.env import player_base
 from gfootball.env.football_action_set import DEFAULT_ACTION_SET
 from gfootball.env.players.base_rl_agent import BaseRLPlayer
 from gfootball.policies.double_expected_sarsa import DoubleExpectedSarsa
-from gfootball.scenarios import e_PlayerRole_GK, e_PlayerRole_CB, e_PlayerRole_CF
+from gfootball.scenarios import e_PlayerRole_CB, e_PlayerRole_CF
 from third_party import gfootball_engine
 
 class Player(BaseRLPlayer):
     def __init__(self, player_config, env_config):
         super().__init__(player_config=player_config, env_config=env_config)
-
-    def get_policy(self, player_config):
-        return DoubleExpectedSarsa(
-            random_frac=player_config['random_frac'], checkpoint=player_config['checkpoint'],
-            verbose=player_config['verbose'],
-        )
 
     def _get_assigned_opponent_to_defend_target(self):
         assert self._observation['ball_owned_team'] == 1, self._observation
