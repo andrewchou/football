@@ -30,8 +30,8 @@ def parse_args():
         help='Semicolon separated list of players, single keyboard player on the left by default')
     parser.add_argument('--level', type=str, default='1_vs_1_easy', help='Level to play')
     parser.add_argument('--action_set', type=str, default='default', help='default or full')
-    parser.add_argument('--real_time', type=bool_arg, default=True,
-        help='If true, environment will slow down so humans can play.')
+    # parser.add_argument('--real_time', type=bool_arg, default=True,
+    #     help='If true, environment will slow down so humans can play.')
     parser.add_argument('--render', type=bool_arg, default=True, help='Whether to do game rendering.')
     parser.add_argument('--warmstart', type=bool_arg, default=False,
         help='Whether to warmstart using the handmade agent.')
@@ -55,7 +55,8 @@ def main():
         'action_set': args.action_set,
         'dump_full_episodes': True,
         'players': players,
-        'real_time': args.real_time and args.render,
+        # 'real_time': args.real_time and args.render,
+        'real_time': args.render,
         'pitch_scale': args.pitch_scale,
     })
     base_player_config = {
@@ -137,7 +138,7 @@ def main():
                 env._agent.process_epoch(items=epoch_history)
                 obs_history.append(env.reset())
                 epoch_history = []
-                if (not args.real_time) and (game_num % 25 == 0):
+                if (not args.render) and (game_num % 25 == 0):
                     env._agent.save(checkpoint=checkpoint)
                 if game_num == args.num_games:
                     break

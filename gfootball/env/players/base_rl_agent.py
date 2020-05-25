@@ -5,6 +5,7 @@ import pygame
 
 from gfootball.common.colors import RED
 from gfootball.common.history import HistoryItem
+from gfootball.common.state.angle import relative_angle_bucket
 from gfootball.common.writer import Writer, write_text_on_frame
 from gfootball.env import football_action_set
 from gfootball.env import player_base
@@ -35,6 +36,8 @@ class BaseRLPlayer(player_base.PlayerBase):
 
         pygame.init()
         self._init_done = False
+
+        self._last_action = football_action_set.action_idle
 
     def get_policy(self, player_config):
         policy_config = player_config['policy_config']
@@ -255,28 +258,7 @@ class BaseRLPlayer(player_base.PlayerBase):
     def _angle_bucket_relative_to_me(self, other_position):
         position = self._get_own_position()
         delta = other_position - position
-        # Angle in radians, in the range [-pi, pi].
-        radians = np.arctan2(delta[1], delta[0])
-        degrees = radians * 180 / np.pi
-        assert -180 <= degrees <= 180, degrees
-        degrees_plus_210 = degrees + 210  # [30, 390]
-        assert 30 <= degrees_plus_210 <= 390, degrees_plus_210
-        wrapped_degrees_plus_210 = degrees_plus_210 % 360
-        assert 0 <= wrapped_degrees_plus_210 <= 360, wrapped_degrees_plus_210
-        bucket = wrapped_degrees_plus_210 // 60  #
-        if bucket == 6:
-            assert wrapped_degrees_plus_210 == 360, wrapped_degrees_plus_210
-            bucket = 5
-        assert 0 <= bucket <= 5, bucket
-        bucket = (bucket + 3) % 6
-        # print('BUCKET')
-        # print(position)
-        # print(opponent)
-        # print(delta)
-        # print(degrees)
-        # print(bucket)
-        assert int(bucket) == bucket, bucket
-        return int(bucket)
+        return relative_angle_bucket(delta_position=delta)
 
     def _opponent_distance_from_me(self):
         position = self._get_own_position()
@@ -366,4 +348,5 @@ class BaseRLPlayer(player_base.PlayerBase):
                     color=RED, bottom_left_corner_of_text=(20, 720 - 20 * (len(debug) - i)),
                     thickness=1, font_scale=0.5)
             self.writer.write(frame=frame)
-        return [action]
+        self._last_action = action
+        return [self._last_action]

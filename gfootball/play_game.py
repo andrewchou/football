@@ -40,8 +40,8 @@ flags.DEFINE_float('pitch_scale', 1.0, 'Pitch scale. Can be 1.0 or 0.5 for now.'
 
 def main(_):
     players = FLAGS.players.split(';') if FLAGS.players else ''
-    assert not (any(['agent' in player for player in players])
-                ), ('Player type \'agent\' can not be used with play_game.')
+    # assert not (any(['agent' in player for player in players])
+    #             ), ('Player type \'agent\' can not be used with play_game.')
     cfg = config.Config({
         'action_set': FLAGS.action_set,
         'dump_full_episodes': True,

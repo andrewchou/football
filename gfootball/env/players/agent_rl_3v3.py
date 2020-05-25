@@ -35,7 +35,8 @@ class Player(BaseRLPlayer):
         if self._observation['game_mode'] != gfootball_engine.e_GameMode.e_GameMode_Normal:
             debug.append(('Not in the run of play. Mode:', self._observation['game_mode']))
             # There's a keeper, so dont worry about own goals
-            return DEFAULT_ACTION_SET[random.randint(0, len(DEFAULT_ACTION_SET) - 1)]
+            # DEFAULT_ACTION_SET[random.randint(0, len(DEFAULT_ACTION_SET) - 1)]
+            return football_action_set.action_short_pass
         #
         if self._they_have_the_ball():
             debug.append('OTHER_TEAM_HAS_THE_BALL')
@@ -188,7 +189,7 @@ class Player(BaseRLPlayer):
 class BasicState(namedtuple('BasicState', [
     'ball_owned_team',  # 3
     'field_position',  # 12 spots (front/front-middle/back-middle/back, right/left/center)
-    'ball_angle_bucket',  # 6 (60 degree buckets)
+    'ball_angle_bucket',  # 8 (45 degree buckets)
     'ball_close',  # 2 (close, far)
     'closest_to_ball_on_my_team',  # 2 (yes, no)
     'opponent_angle_bucket',  # 6 (60 degree buckets)
@@ -208,10 +209,10 @@ class BasicState(namedtuple('BasicState', [
         assert len(self.field_position) == 2, self
         assert self.field_position[0] in ['F', 'FM', 'BM', 'B'], self
         assert self.field_position[1] in ['R', 'L', 'C'], self
-        assert self.ball_angle_bucket in (0, 1, 2, 3, 4, 5), self
+        assert self.ball_angle_bucket in (0, 1, 2, 3, 4, 5, 6, 7), self
         assert isinstance(self.ball_close, bool), self
         assert isinstance(self.closest_to_ball_on_my_team, bool), self
-        assert self.opponent_angle_bucket in (0, 1, 2, 3, 4, 5), self
+        assert self.opponent_angle_bucket in (0, 1, 2, 3, 4, 5, 6, 7), self
         assert isinstance(self.opponent_close, bool), self
         assert isinstance(self.sticky_actions, tuple), self
         assert len(self.sticky_actions) == 10, self
