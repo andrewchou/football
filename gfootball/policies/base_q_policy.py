@@ -14,24 +14,20 @@ class BaseQPolicy(BasePolicy):
 
     def _load_single_Q(self, Q_json):
         Q = self._get_empty_Q()
-        n = 0
-        for state, action_values_dict in Q_json.items():
-            for action, value in action_values_dict.items():
-                # print('LOADED:', state, action, value)
-                Q[state][action] = value
-                n += 1
-        print('Loaded %d Q values.' % n)
         return Q
 
     def load(self, checkpoint):
+        self.Q = self._get_empty_Q()
         if checkpoint:
-            loaded = np.load(checkpoint)
-            assert 0, loaded
-            # with open(checkpoint, 'rb') as inf:
-            #     QS = pickle.load(inf)
-            # self.Q = self._load_single_Q(Q_json=QS['Q1'])
-        else:
-            self.Q = self._get_empty_Q()
+            loaded = np.load(checkpoint, allow_pickle=True)
+            Q_json = loaded['Q'].all()
+            n = 0
+            for state, action_values_dict in Q_json.items():
+                for action, value in action_values_dict.items():
+                    # print('LOADED:', state, action, value)
+                    self.Q[state][action] = value
+                    n += 1
+            print('Loaded %d Q values.' % n)
 
     def save(self, checkpoint):
         Q = {k: {k2: v2 for k2, v2 in v.items() if v2 != 0.0} for k, v in self.Q.items()}
