@@ -40,6 +40,8 @@ class Player(BaseRLPlayer):
         ):
             return self._get_hardcoded_pass_action(
                 pass_player_index=3 - self._get_own_index(), debug=debug)
+        if game_mode == gfootball_engine.e_GameMode.e_GameMode_Penalty:
+            return self._get_hardcoded_shot_action(debug=debug)
         # if game_mode == gfootball_engine.e_GameMode.e_GameMode_GoalKick:
             # Otherwise accidently score on the keeper a lot hitting passing
             # return football_action_set.action_idle
@@ -141,7 +143,7 @@ class Player(BaseRLPlayer):
                 self._teammate_offside() # Only relevant in 3v3, need to check index if have more players
             ):
                 move_action = self._avoid_opponent(
-                    own_position, closest_front_opponent, move_target)
+                    own_position=own_position, opponent_position=closest_front_opponent, target=move_target)
                 debug.append(('DRIBBLING:', move_action))
             else:
                 return self._get_hardcoded_pass_action(pass_player_index=best_pass_player_index, debug=debug)

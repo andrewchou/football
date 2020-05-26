@@ -9,6 +9,7 @@ from gfootball.common.state.angle import relative_angle_bucket
 from gfootball.common.writer import Writer, write_text_on_frame
 from gfootball.env import football_action_set
 from gfootball.env import player_base
+from gfootball.env.football_action_set import DEFAULT_ACTION_SET
 from gfootball.policies.base_policy import PolicyConfig, PolicyType
 from gfootball.policies.double_expected_sarsa import DoubleExpectedSarsa
 from gfootball.policies.nstep_sarsa import NStepSarsa
@@ -65,26 +66,32 @@ class BaseRLPlayer(player_base.PlayerBase):
         '''Computes distance between two objects.'''
         return np.linalg.norm(np.array(object1) - np.array(object2))
 
-    def _direction_action(self, delta):
+    def _direction_action(self, delta, adjacent_to_action=None):
         '''For required movement direction vector returns appropriate action.'''
         all_directions = [
-            football_action_set.action_top,
-            football_action_set.action_top_left,
-            football_action_set.action_left,
-            football_action_set.action_bottom_left,
-            football_action_set.action_bottom,
-            football_action_set.action_bottom_right,
-            football_action_set.action_right,
-            football_action_set.action_top_right
+            (football_action_set.action_top, (0, -1)),
+            (football_action_set.action_top_left, (-1, -1)),
+            (football_action_set.action_left, (-1, 0)),
+            (football_action_set.action_bottom_left, (-1, 1)),
+            (football_action_set.action_bottom, (0, 1)),
+            (football_action_set.action_bottom_right, (1, 1)),
+            (football_action_set.action_right, (1, 0)),
+            (football_action_set.action_top_right, (1, -1)),
         ]
-        all_directions_vec = [
-            (0, -1), (-1, -1), (-1, 0), (-1, 1),
-            (0, 1), (1, 1), (1, 0), (1, -1)]
-        all_directions_vec = [
-            np.array(v) / np.linalg.norm(np.array(v)) for v in all_directions_vec
+        if adjacent_to_action is not None:
+            assert adjacent_to_action in DEFAULT_ACTION_SET
+            adjacent_to_index = [a for a, v in all_directions].index(adjacent_to_action)
+            assert 0 <= adjacent_to_index < len(all_directions), adjacent_to_index
+            all_directions = [
+                all_directions[(adjacent_to_index - 1) % len(all_directions)],
+                all_directions[adjacent_to_index],
+                all_directions[(adjacent_to_index + 1) % len(all_directions)],
+            ]
+        all_directions = [
+            (a, np.array(v) / np.linalg.norm(np.array(v))) for a, v in all_directions
         ]
-        best_direction = np.argmax([np.dot(delta, v) for v in all_directions_vec])
-        action = all_directions[best_direction]
+        best_direction = np.argmax([np.dot(delta, v) for a, v in all_directions])
+        action = all_directions[best_direction][0]
         # TODO
         # if (self._last_action == action): # or (self._last_action == football_action_set.action_sprint):
         #     return football_action_set.action_idle
@@ -213,25 +220,27 @@ class BaseRLPlayer(player_base.PlayerBase):
                 return index
         assert 0, self._observation
 
-    def _avoid_opponent(self, active, opponent, target):
+    def _avoid_opponent(self, own_position, opponent_position, target):
         '''Computes movement action to avoid a given opponent.
 
         Args:
-          active: Active player.
-          opponent: Opponent to be avoided.
+          own_position: Active player.
+          opponent_position: Opponent to be avoided.
           target: Original movement direction of the active player.
 
         Returns:
           Action to perform to avoid the opponent.
         '''
         # Choose a perpendicular direction to the opponent, towards the target.
-        delta = opponent - active
-        delta_t = target - active
-        new_delta = [delta[1], -delta[0]]
-        if delta_t[0] * new_delta[0] < 0:
-            new_delta = [-new_delta[0], -new_delta[1]]
-
-        return self._direction_action(new_delta)
+        delta_t = target - own_position
+        original_action = self._direction_action(delta=delta_t)
+        delta = opponent_position - own_position
+        return self._direction_action(delta=delta, adjacent_to_action=original_action)
+        # new_delta = [delta[1], -delta[0]]
+        # if np.dot(delta_t, new_delta) < 0:
+        #     new_delta = [-new_delta[0], -new_delta[1]]
+        #
+        # return self._direction_action(new_delta)
 
     def _get_ball_location(self):
         return self._observation['ball'][:2]

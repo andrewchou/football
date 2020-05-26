@@ -67,7 +67,7 @@ class Player(BaseRLPlayer):
         # Maybe avoid opponent on your way?
         if dist_front_opp < 0.08:
             return self._avoid_opponent(
-                active=active, opponent=closest_front_opponent, target=move_target)
+                own_position=active, opponent_position=closest_front_opponent, target=move_target)
         else:
             return self._direction_action(move_target - active)
 
