@@ -163,7 +163,7 @@ class BaseRLPlayer(player_base.PlayerBase):
         # May return None!
         return closest
 
-    def _score_pass_target(self, own_position, player_position, debug):
+    def _score_pass_target(self, own_position, player_position, n_trajectory_samples, debug):
         '''Computes score of the pass between players.
 
         Args:
@@ -201,17 +201,20 @@ class BaseRLPlayer(player_base.PlayerBase):
         best_score = None
         best_target = None
         best_index = None
+        best_is_long_pass = None
         for i, player_position in enumerate(self._observation['left_team']):
-            if self._object_distance(object1=player_position, object2=own_position) > 0.3:
-                continue
+            long_pass = self._object_distance(
+                object1=player_position, object2=own_position) > 0.3
             score = self._score_pass_target(
-                own_position=own_position, player_position=player_position, debug=debug)
+                own_position=own_position, player_position=player_position,
+                n_trajectory_samples=50 if long_pass else 10, debug=debug)
             debug.append(('pass_target', i, 'score', score))
             if best_score is None or score > best_score:
                 best_score = score
                 best_target = player_position
                 best_index = i
-        return best_index, best_target
+                best_is_long_pass = long_pass
+        return best_index, best_target, best_is_long_pass
 
     def _get_own_keeper_index(self):
         for index in range(len(self._observation['left_team'])):

@@ -39,7 +39,8 @@ class Player(BaseRLPlayer):
             gfootball_engine.e_GameMode.e_GameMode_ThrowIn,
         ):
             return self._get_hardcoded_pass_action(
-                pass_player_index=3 - self._get_own_index(), debug=debug)
+                # TODO could be a long pass
+                pass_player_index=3 - self._get_own_index(), long_pass=False, debug=debug)
         if game_mode == gfootball_engine.e_GameMode.e_GameMode_Penalty:
             return self._get_hardcoded_shot_action(debug=debug)
         # if game_mode == gfootball_engine.e_GameMode.e_GameMode_GoalKick:
@@ -81,7 +82,7 @@ class Player(BaseRLPlayer):
         debug.append(('SHOOTING', self._get_ball_location()))
         return football_action_set.action_shot
 
-    def _get_hardcoded_pass_action(self, pass_player_index, debug):
+    def _get_hardcoded_pass_action(self, pass_player_index, long_pass, debug):
         assert pass_player_index not in (self._get_own_keeper_index(), self._get_own_index())
         delta = self._get_teammate_position() - self._get_own_position()
         direction_action = self._direction_action(delta)
@@ -90,10 +91,14 @@ class Player(BaseRLPlayer):
             (self._action_history[-1] == direction_action) and
             # If you press pass multiple times in a row then the next player will just end up passing.
             # TODO have the pass target run toward the ball
-            (football_action_set.action_short_pass not in self._action_history[-4:])
+            (football_action_set.action_short_pass not in self._action_history[-4:]) and
+            (football_action_set.action_long_pass not in self._action_history[-4:])
         ):
             debug.append('PASSING')
-            return football_action_set.action_short_pass
+            if long_pass:
+                return football_action_set.action_long_pass
+            else:
+                return football_action_set.action_short_pass
         else:
             debug.append(('PREPARING FOR PASS:', direction_action))
             return direction_action
@@ -136,7 +141,7 @@ class Player(BaseRLPlayer):
 
         # Maybe avoid opponent on your way?
         if dist_front_opp < 0.08:
-            best_pass_player_index, best_pass_player_position = self._best_pass_player_index(debug=debug)
+            best_pass_player_index, best_pass_player_position, best_is_long_pass = self._best_pass_player_index(debug=debug)
             # Dont pass to self or GK
             if (
                 (best_pass_player_index in (self._get_own_index(), self._get_own_keeper_index())) or
@@ -146,7 +151,8 @@ class Player(BaseRLPlayer):
                     own_position=own_position, opponent_position=closest_front_opponent, target=move_target)
                 debug.append(('DRIBBLING:', move_action))
             else:
-                return self._get_hardcoded_pass_action(pass_player_index=best_pass_player_index, debug=debug)
+                return self._get_hardcoded_pass_action(
+                    pass_player_index=best_pass_player_index, long_pass=best_is_long_pass, debug=debug)
         else:
             # Compute run direction.
             move_action = self._direction_action(move_target - own_position)
