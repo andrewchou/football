@@ -36,8 +36,7 @@ class BaseRLPlayer(player_base.PlayerBase):
 
         pygame.init()
         self._init_done = False
-
-        self._last_action = football_action_set.action_idle
+        self.reset()
 
     def get_policy(self, player_config):
         policy_config = player_config['policy_config']
@@ -88,18 +87,18 @@ class BaseRLPlayer(player_base.PlayerBase):
         #     return football_action_set.action_idle
         return action
 
-    def _closest_opponent_to_object(self, o):
+    def _closest_opponent_to_object(self, obj):
         '''For a given object returns the closest opponent.
 
         Args:
-          o: Source object.
+          obj: Source object.
 
         Returns:
           Closest opponent.'''
         min_d = None
         closest = None
         for p in self._observation['right_team']:
-            d = self._object_distance(o, p)
+            d = self._object_distance(obj, p)
             if min_d is None or d < min_d:
                 min_d = d
                 closest = p
@@ -154,47 +153,62 @@ class BaseRLPlayer(player_base.PlayerBase):
         # May return None!
         return closest
 
-    def _score_pass_target(self, active, player):
+    def _score_pass_target(self, own_position, player_position, debug):
         '''Computes score of the pass between players.
 
         Args:
-          active: Player doing the pass.
-          player: Player receiving the pass.
+          own_position: Player doing the pass.
+          player_position: Player receiving the pass.
 
         Returns:
           Score of the pass.
         '''
-        opponent = self._closest_opponent_to_object(player)
-        dist = self._object_distance(player, opponent)
-        trajectory = player - active
+        # print('own_position', own_position)
+        trajectory = player_position - own_position
         dist_closest_traj = None
         for i in range(10):
-            position = active + (i + 1) / 10.0 * trajectory
+            # print('i', i)
+            position = own_position + (i + 1) / 10.0 * trajectory
+            # print('position', position)
             opp_traj = self._closest_opponent_to_object(position)
-            dist_traj = self._object_distance(position, opp_traj)
+            # print('opp_traj', opp_traj)
+            dist_traj = self._object_distance(object1=position, object2=opp_traj)
+            # print('dist_traj', dist_traj)
             if dist_closest_traj is None or dist_traj < dist_closest_traj:
                 dist_closest_traj = dist_traj
-        return -dist_closest_traj
+        return dist_closest_traj
 
-    def _best_pass_player_position(self, active):
+    def _best_pass_player_index(self, debug):
         '''Computes best pass a given player can do.
 
         Args:
-          active: Player doing the pass.
+          own_position: Player doing the pass.
 
         Returns:
           Best target player receiving the pass.
         '''
+        own_position = self._get_own_position()
         best_score = None
         best_target = None
-        for player in self._observation['left_team']:
-            if self._object_distance(player, active) > 0.3:
+        best_index = None
+        for i, player_position in enumerate(self._observation['left_team']):
+            if self._object_distance(object1=player_position, object2=own_position) > 0.3:
                 continue
-            score = self._score_pass_target(active, player)
+            score = self._score_pass_target(
+                own_position=own_position, player_position=player_position, debug=debug)
+            debug.append(('pass_target', i, 'score', score))
             if best_score is None or score > best_score:
                 best_score = score
-                best_target = player
-        return best_target
+                best_target = player_position
+                best_index = i
+        return best_index, best_target
+
+    def _get_own_keeper_index(self):
+        for index in range(len(self._observation['left_team'])):
+            role = self._get_role(index=index)
+            if role == e_PlayerRole_GK:
+                return index
+        assert 0, self._observation
 
     def _avoid_opponent(self, active, opponent, target):
         '''Computes movement action to avoid a given opponent.
@@ -234,6 +248,12 @@ class BaseRLPlayer(player_base.PlayerBase):
     def _they_have_the_ball(self):
         return self._observation['ball_owned_team'] == 1
 
+    def _their_gk_has_the_ball(self):
+        if not self._they_have_the_ball():
+            return False
+        other_role = self._observation['right_team_roles'][self._observation['ball_owned_player']]
+        return other_role == e_PlayerRole_GK
+
     def _we_have_the_ball(self):
         return self._observation['ball_owned_team'] == 0
 
@@ -249,7 +269,7 @@ class BaseRLPlayer(player_base.PlayerBase):
 
     def _opponent_angle_bucket_relative_to_me(self):
         position = self._get_own_position()
-        opponent = self._closest_opponent_to_object(o=position)
+        opponent = self._closest_opponent_to_object(obj=position)
         return self._angle_bucket_relative_to_me(other_position=opponent)
 
     def _ball_angle_bucket_relative_to_me(self):
@@ -262,7 +282,7 @@ class BaseRLPlayer(player_base.PlayerBase):
 
     def _opponent_distance_from_me(self):
         position = self._get_own_position()
-        opponent = self._closest_opponent_to_object(o=position)
+        opponent = self._closest_opponent_to_object(obj=position)
         return self._object_distance(object1=position, object2=opponent)
 
     def _ball_distance_from_me(self):
@@ -348,5 +368,8 @@ class BaseRLPlayer(player_base.PlayerBase):
                     color=RED, bottom_left_corner_of_text=(20, 720 - 20 * (len(debug) - i)),
                     thickness=1, font_scale=0.5)
             self.writer.write(frame=frame)
-        self._last_action = action
-        return [self._last_action]
+        self._action_history.append(action)
+        return [action]
+
+    def reset(self):
+        self._action_history = []

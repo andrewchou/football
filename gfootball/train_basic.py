@@ -56,7 +56,7 @@ def main():
         'dump_full_episodes': True,
         'players': players,
         # 'real_time': args.real_time and args.render,
-        'real_time': args.render,
+        'real_time': args.render and (not args.video),
         'pitch_scale': args.pitch_scale,
     })
     base_player_config = {
@@ -136,6 +136,7 @@ def main():
                 # for item in self_play_history.sample(n=int(1e3)):
                 #     env._agent.give_reward(item=item) # ._replace(reward=item.reward - mean_reward))
                 env._agent.process_epoch(items=epoch_history)
+                env._agent.reset()
                 obs_history.append(env.reset())
                 epoch_history = []
                 if (not args.render) and (game_num % 25 == 0):

@@ -14,6 +14,7 @@ from third_party import gfootball_engine
 class Player(BaseRLPlayer):
     def __init__(self, player_config, env_config):
         super().__init__(player_config=player_config, env_config=env_config)
+        self._shoot_distance = 0.15
 
     def _get_assigned_opponent_to_defend_target(self):
         assert self._observation['ball_owned_team'] == 1, self._observation
@@ -28,6 +29,28 @@ class Player(BaseRLPlayer):
             other_player_with_ball_position = other_team_positions[3 - ball_owner_index]
         return other_player_with_ball_position - self._get_own_position()
 
+    def _get_hardcoded_defensive_action(self, debug):
+        debug.append('OTHER_TEAM_HAS_THE_BALL')
+        if self._am_closest_team_member_to_opponent_with_ball() and (not self._their_gk_has_the_ball()):
+            move_target = self._get_ball_owner_location_target()
+            move_action = self._direction_action(move_target)
+            debug.append(('IM THE CLOSEST DEFENDER', move_target, move_action))
+        else:
+            move_target = self._get_assigned_opponent_to_defend_target()
+            move_action = self._direction_action(move_target)
+            debug.append(('IM SECONDARY DEFENDER', move_target, move_action))
+        return move_action
+        # if self._last_action == football_action_set.action_pressure:
+        #     return football_action_set.action_sprint
+        # self._pressure_enabled = True
+        # return football_action_set.action_pressure
+
+    def _get_hardcoded_loose_ball_action(self, debug):
+        move_target = self._get_ball_location() - own_position
+        move_action = self._direction_action(move_target)
+        debug.append(('RUNNING TO THE BALL:', move_action))
+        return move_action
+
     def _get_hardcoded_action(self, debug):
         '''Returns action to perform for the current observations.'''
         own_position = self._get_own_position()
@@ -35,46 +58,33 @@ class Player(BaseRLPlayer):
         if self._observation['game_mode'] != gfootball_engine.e_GameMode.e_GameMode_Normal:
             debug.append(('Not in the run of play. Mode:', self._observation['game_mode']))
             # There's a keeper, so dont worry about own goals
-            # DEFAULT_ACTION_SET[random.randint(0, len(DEFAULT_ACTION_SET) - 1)]
-            return football_action_set.action_short_pass
+            # TODO face toward teammate and then pass
+            return DEFAULT_ACTION_SET[random.randint(0, len(DEFAULT_ACTION_SET) - 1)]
+            # return football_action_set.action_short_pass
         #
         if self._they_have_the_ball():
-            debug.append('OTHER_TEAM_HAS_THE_BALL')
-            if self._am_closest_team_member_to_opponent_with_ball():
-                move_target = self._get_ball_owner_location_target()
-                move_action = self._direction_action(move_target)
-                debug.append(('IM THE CLOSEST DEFENDER', move_target, move_action))
-            else:
-                move_target = self._get_assigned_opponent_to_defend_target()
-                move_action = self._direction_action(move_target)
-                debug.append(('IM SECONDARY DEFENDER', move_target, move_action))
-            return move_action
-            # if self._last_action == football_action_set.action_pressure:
-            #     return football_action_set.action_sprint
-            # self._pressure_enabled = True
-            # return football_action_set.action_pressure
+            return self._get_hardcoded_defensive_action(debug=debug)
         if not self._we_have_the_ball():
-            move_target = self._get_ball_location() - own_position
-            move_action = self._direction_action(move_target)
-            debug.append(('RUNNING TO THE BALL:', move_action))
-            return move_action
+            return self._get_hardcoded_loose_ball_action(debug=debug)
 
         # if self._pressure_enabled:
         #     self._pressure_enabled = False
         #     return football_action_set.action_release_pressure
-        target_x = 0.85 if self.pitch_scale == 1.0 else 0.35
-        target_x = max(target_x, self._get_own_position()[0])
+        target_x = self.pitch_scale - 0.15
+        target_x = max(target_x, own_position[0])
 
         ball_location = self._get_ball_location()
         debug.append(('ball_location', ball_location))
-        if (ball_location[0] > 0.7) and (abs(ball_location[0] < 0.15)):
+
+        GOOD_SPOT_TO_SHOOT_FROM = (target_x, 0)
+        if (
+            (ball_location[0] > self.pitch_scale - 0.25) and
+            (np.linalg.norm(ball_location - GOOD_SPOT_TO_SHOOT_FROM) < self._shoot_distance)
+        ):
             debug.append(('SHOOTING', ball_location))
             return football_action_set.action_shot
 
-        GOOD_SPOT_TO_SHOOT_FROM = (target_x, 0)
         move_target = GOOD_SPOT_TO_SHOOT_FROM
-        # Compute run direction.
-        move_action = self._direction_action(move_target - own_position)
 
         closest_front_opponent = self._closest_front_opponent(own_position, move_target)
         if closest_front_opponent is not None:
@@ -84,20 +94,30 @@ class Player(BaseRLPlayer):
 
         # Maybe avoid opponent on your way?
         if dist_front_opp < 0.08:
-            best_pass_player_position = self._best_pass_player_position(own_position)
-            if np.array_equal(best_pass_player_position, own_position):
+            best_pass_player_index, best_pass_player_position = self._best_pass_player_index(debug=debug)
+            # Dont pass to self or GK
+            if best_pass_player_index in (self._get_own_index(), self._get_own_keeper_index()):
                 move_action = self._avoid_opponent(
                     own_position, closest_front_opponent, move_target)
                 debug.append(('DRIBBLING:', move_action))
             else:
                 delta = best_pass_player_position - own_position
                 direction_action = self._direction_action(delta)
-                if self._last_action == direction_action:
+                if (
+                    self._action_history and
+                    (self._action_history[-1] == direction_action) and
+                    # If you press pass multiple times in a row then the next player will just end up passing.
+                    # TODO have the pass target run toward the ball
+                    (football_action_set.action_short_pass not in self._action_history[-4:])
+                ):
                     debug.append('PASSING')
                     return football_action_set.action_short_pass
                 else:
                     debug.append(('PREPARING FOR PASS:', direction_action))
                     return direction_action
+        else:
+            # Compute run direction.
+            move_action = self._direction_action(move_target - own_position)
         return move_action
 
     def _get_teammate_position(self):

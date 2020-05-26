@@ -1,14 +1,9 @@
 """Sample bot player."""
-import pickle
-import random
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 
 import numpy as np
-import pygame
 
 from gfootball.env import football_action_set
-from gfootball.env import player_base
-from gfootball.env.football_action_set import DEFAULT_ACTION_SET
 from gfootball.env.players.base_rl_agent import BaseRLPlayer
 
 class Player(BaseRLPlayer):
