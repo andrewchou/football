@@ -58,6 +58,9 @@ class BaseRLPlayer(player_base.PlayerBase):
     def save(self, checkpoint):
         self.policy.save(checkpoint=checkpoint)
 
+    def _opponent_goal_location(self):
+        return np.array([self.pitch_scale, 0.0])
+
     def _object_distance(self, object1, object2):
         '''Computes distance between two objects.'''
         return np.linalg.norm(np.array(object1) - np.array(object2))
@@ -239,8 +242,24 @@ class BaseRLPlayer(player_base.PlayerBase):
         other_player_with_ball_position = other_team_positions[self._observation['ball_owned_player']]
         return other_player_with_ball_position
 
+    def _get_ball_owner_velocity(self):
+        assert self._observation['ball_owned_team'] == 1, self._observation
+        other_team_directions = self._observation['right_team_direction']
+        other_player_with_ball_direction = other_team_directions[self._observation['ball_owned_player']]
+        return other_player_with_ball_direction
+
+    def _is_ball_owner_facing_our_goal(self):
+        assert self._observation['ball_owned_team'] == 1, self._observation
+        other_player_with_ball_velocity = self._get_ball_owner_velocity()
+        # print('_is_ball_owner_facing_our_goal', other_player_with_ball_velocity[0] < 0, other_player_with_ball_velocity)
+        return other_player_with_ball_velocity[0] < 0
+
     def _get_ball_owner_location_target(self):
-        return self._get_ball_owner_location() - self._get_own_position()
+        target = self._get_ball_owner_location() - self._get_own_position()
+        # if self._is_ball_owner_facing_our_goal():
+        #     other_player_with_ball_velocity = self._get_ball_owner_velocity()
+        #     target += 3 * other_player_with_ball_velocity
+        return target
 
     def _get_own_position(self):
         return self._observation['left_team'][self._get_own_index()]
