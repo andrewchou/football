@@ -8,7 +8,7 @@ from gfootball.env import football_action_set
 from gfootball.env.football_action_set import DEFAULT_ACTION_SET
 from gfootball.env.players.base_rl_agent import BaseRLPlayer
 from gfootball.policies.double_expected_sarsa import DoubleExpectedSarsa
-from gfootball.scenarios import e_PlayerRole_CB, e_PlayerRole_CF
+from gfootball.scenarios import e_PlayerRole_CB, e_PlayerRole_CF, e_PlayerRole_GK
 from third_party import gfootball_engine
 
 class Player(BaseRLPlayer):
@@ -21,12 +21,15 @@ class Player(BaseRLPlayer):
         other_team_positions = self._observation['right_team']
         ball_owner_index = self._observation['ball_owned_player']
         # 0 is the keeper
-        if ball_owner_index == 0:
+        n_players_per_team = len(other_team_positions)
+        # TODO handle matchups for non-3v3
+        if (ball_owner_index == 0) or (len(other_team_positions) != 3):
             # Match up with the opposite type of player
-            other_player_with_ball_position = other_team_positions[3 - self._get_own_index()]
+            other_player_with_ball_position = other_team_positions[n_players_per_team - self._get_own_index()]
         else:
+            # TODO handle matchups for non-3v3
             assert ball_owner_index in (1, 2), ball_owner_index
-            other_player_with_ball_position = other_team_positions[3 - ball_owner_index]
+            other_player_with_ball_position = other_team_positions[n_players_per_team - ball_owner_index]
         return other_player_with_ball_position - self._get_own_position()
 
     def _get_hardcoded_setpiece_action(self, debug):
@@ -38,9 +41,10 @@ class Player(BaseRLPlayer):
             gfootball_engine.e_GameMode.e_GameMode_FreeKick,
             gfootball_engine.e_GameMode.e_GameMode_ThrowIn,
         ):
+            pass_player_index = self._closest_team_member_index_to_me()
             return self._get_hardcoded_pass_action(
                 # TODO could be a long pass
-                pass_player_index=3 - self._get_own_index(), long_pass=False, debug=debug)
+                pass_player_index=pass_player_index, long_pass=False, debug=debug)
         if game_mode == gfootball_engine.e_GameMode.e_GameMode_Penalty:
             return self._get_hardcoded_shot_action(debug=debug)
         # if game_mode == gfootball_engine.e_GameMode.e_GameMode_GoalKick:
@@ -84,7 +88,7 @@ class Player(BaseRLPlayer):
 
     def _get_hardcoded_pass_action(self, pass_player_index, long_pass, debug):
         assert pass_player_index not in (self._get_own_keeper_index(), self._get_own_index())
-        delta = self._get_teammate_position() - self._get_own_position()
+        delta = self._get_teammate_position(teammate_index=pass_player_index) - self._get_own_position()
         direction_action = self._direction_action(delta)
         if (
             self._action_history and
@@ -145,7 +149,7 @@ class Player(BaseRLPlayer):
             # Dont pass to self or GK
             if (
                 (best_pass_player_index in (self._get_own_index(), self._get_own_keeper_index())) or
-                self._teammate_offside() # Only relevant in 3v3, need to check index if have more players
+                self._any_teammate_offside() # Only relevant in 3v3, need to check index if have more players
             ):
                 move_action = self._avoid_opponent(
                     own_position=own_position, opponent_position=closest_front_opponent, target=move_target)
@@ -158,20 +162,27 @@ class Player(BaseRLPlayer):
             move_action = self._direction_action(move_target - own_position)
         return move_action
 
-    def _get_teammate_position(self):
+    def _get_teammate_position(self, teammate_index):
         active_index = self._get_own_index()
-        assert active_index in [1, 2], active_index
-        return self._observation['left_team'][3 - active_index]
+        assert teammate_index != active_index, (teammate_index, active_index)
+        assert self._observation['left_team_roles'][active_index] != e_PlayerRole_GK
+        return self._observation['left_team'][teammate_index]
 
-    def _teammate_offside(self):
-        teammate_pos = self._get_teammate_position()
-        num_opponents_closer_to_their_goal = 0
-        for opponent_pos in self._observation['right_team']:
-            if teammate_pos[0] < opponent_pos[0]:
-                num_opponents_closer_to_their_goal += 1
-        return bool(
-            (num_opponents_closer_to_their_goal < 2) and (teammate_pos[0] > 0)
-        )
+    def _any_teammate_offside(self):
+        active_index = self._get_own_index()
+        for teammate_index, teammate_position in enumerate(self._observation['left_team']):
+            if teammate_index == active_index:
+                continue
+            num_opponents_closer_to_their_goal = 0
+            for opponent_pos in self._observation['right_team']:
+                if teammate_position[0] < opponent_pos[0]:
+                    num_opponents_closer_to_their_goal += 1
+            offside = bool(
+                (num_opponents_closer_to_their_goal < 2) and (teammate_position[0] > 0)
+            )
+            if offside:
+                return True
+        return False
 
     def get_state(self, observations):
         assert len(observations) == 1, len(observations)
@@ -240,7 +251,7 @@ class Player(BaseRLPlayer):
             sticky_actions=tuple(observation['sticky_actions']),
             run_of_play=bool(observation['game_mode'] == 0),
             am_offside=self._am_offside(),
-            teammate_offside=self._teammate_offside(),
+            teammate_offside=self._any_teammate_offside(),
             role=self._get_role(),
         )
 
@@ -279,7 +290,9 @@ class BasicState(namedtuple('BasicState', [
         assert isinstance(self.run_of_play, bool), self
         assert isinstance(self.am_offside, bool), self
         assert isinstance(self.teammate_offside, bool), self
-        assert self.role in [e_PlayerRole_CB, e_PlayerRole_CF], self
+        assert isinstance(self.role, int), self
+        assert 0 <= self.role <= 9, self
+        # assert self.role in [e_PlayerRole_CB, e_PlayerRole_CF], self
         return self
 
 # def update_states():

@@ -133,6 +133,28 @@ class BaseRLPlayer(player_base.PlayerBase):
         assert closest_i is not None
         return closest_i
 
+    def _closest_team_member_index_to_me(self):
+        '''For a given object returns the closest team member index.
+
+        Args:
+          o: Source object.
+
+        Returns:
+          Closest opponent.'''
+        own_position = self._get_own_position()
+        own_index = self._get_own_index()
+        min_d = None
+        closest_i = None
+        for i, p in enumerate(self._observation['left_team']):
+            if i == own_index:
+                continue
+            d = self._object_distance(object1=own_position, object2=p)
+            if ((min_d is None) or (d < min_d)) and (self._get_role(index=i) != e_PlayerRole_GK):
+                min_d = d
+                closest_i = i
+        assert closest_i is not None
+        return closest_i
+
     def _closest_team_member_index_to_opponent_with_ball(self):
         return self._closest_team_member_index_to_object(o=self._get_ball_owner_location())
 
