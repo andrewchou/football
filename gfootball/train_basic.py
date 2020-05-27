@@ -5,25 +5,15 @@ import os
 
 from gfootball.env.config import Config
 
+from gfootball.common.args import bool_arg
 from gfootball.common.history import History, HistoryItem
 from gfootball.env import football_env
 from gfootball.env.football_action_set import DEFAULT_ACTION_SET
 from gfootball.policies.base_policy import PolicyConfig, PolicyType
 
-def bool_arg(x):
-    try:
-        return bool(int(x))
-    except ValueError:
-        pass
-    x = x.lower()
-    if x.startswith('f'):
-        return False
-    if x.startswith('t'):
-        return True
-    raise ValueError('Invalid: %s' % x)
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Neural net training')
+    parser = argparse.ArgumentParser(description='Train')
     # 'keyboard:left_players=1'
     parser.add_argument(
         '--players', type=str, default='bot_1v1:left_players=1',
@@ -145,7 +135,7 @@ def main():
                     break
     except KeyboardInterrupt:
         logging.warning('Game stopped, writing dump...')
-        if (not args.real_time):
+        if (not args.render):
             env._agent.save(checkpoint='agent.pkl')
         # env.write_dump('shutdown')
         # return env._agent

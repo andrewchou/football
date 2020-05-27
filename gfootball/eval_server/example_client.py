@@ -16,43 +16,41 @@
 
 It creates remote football game with given credentials and plays a few games.
 """
-
+import argparse
+import logging
 import random
 
-import grpc
 import numpy as np
 import tensorflow.compat.v2 as tf
-from absl import app
-from absl import flags
-from absl import logging
 
-from gfootball.env.football_action_set import DEFAULT_ACTION_SET
+from gfootball.env.football_action_set import DEFAULT_ACTION_SET, ActionSetType
+from gfootball.common.args import bool_arg
 from gfootball.env.football_env import FootballEnv
 
 import gfootball.env as football_env
 from gfootball.env import football_action_set
 from gfootball.env.config import Config
-from gfootball.env.players import agent_1v1, agent_rl_1v1
+from gfootball.env.players import agent_1v1, agent_rl_1v1, agent_rl_3v3
 from gfootball.env.players.ppo2_cnn import Player
+from gfootball.policies.base_policy import PolicyConfig, PolicyType
 
-NUM_ACTIONS = len(football_action_set.ACTION_SET_DICT['default'])
+NUM_ACTIONS = len(DEFAULT_ACTION_SET)
 
-def get_flags():
-    FLAGS = flags.FLAGS
-    flags.DEFINE_string('username', None, 'Username to use')
-    flags.mark_flag_as_required('username')
-    flags.DEFINE_string('token', None, 'Token to use.')
-    flags.DEFINE_integer('how_many', 1000, 'How many games to play')
-    flags.DEFINE_bool('render', False, 'Whether to render a game.')
-    flags.DEFINE_string('track', '', 'Name of the competition track.')
-    flags.DEFINE_string('model_name', '',
-        'A model identifier to be displayed on the leaderboard.')
-    # flags.DEFINE_string('inference_model', '',
-    #     'A path to an inference model. Empty for random actions')
-    flags.DEFINE_string('checkpoint', '',
-        'A path to an checkpoint saved by run_ppo2.py. Empty for random actions')
-    flags.DEFINE_enum('action_set', 'default', ['default', 'full'], 'Action set')
-    return FLAGS
+def parse_args():
+    parser = argparse.ArgumentParser(description='Client')
+    parser.add_argument('--username', type=str, required=True, help='Username to use')
+    parser.add_argument('--token', type=str, required=True, help='Token to use.')
+    parser.add_argument('--how_many', type=int, default=1, help='How many games to play')
+    parser.add_argument('--render', type=bool_arg, default=True, help='Whether to render a game.')
+    # ['mini', '11vs11', 'multiagent']
+    parser.add_argument('--track', type=str, default='11vs11', help='Name of the competition track.')
+    parser.add_argument('--model_name', type=str, default='test',
+        help='A model identifier to be displayed on the leaderboard.')
+    parser.add_argument('--checkpoint', type=str, default=None,
+        help='A path to an checkpoint saved by run_ppo2.py. Empty for random actions')
+    parser.add_argument('--action_set', type=ActionSetType, default=ActionSetType.DEFAULT, help='Action set')
+    parser.add_argument('--verbose', type=bool_arg, default=False)
+    return parser.parse_args()
 
 def random_actions(obs):
     num_players = 1 if len(obs.shape) == 3 else obs.shape[0]
@@ -85,14 +83,27 @@ def get_inference_model(inference_model):
     model = tf.saved_model.load(inference_model)
     return lambda obs: generate_actions(obs, model)
 
-def get_player(checkpoint):
+def get_player(args):
     player_config = {
         'index': 0,
         'player_keyboard': 0,
         # 'player_ppo2_cnn': 0,
         'left_players': 1,
         'right_players': 0,
-        'checkpoint': checkpoint,
+        'checkpoint': args.checkpoint,
+        'warmstart': bool(args.checkpoint),
+        'verbose': args.verbose,
+        'video': None,
+        'policy_config': PolicyConfig(
+            policy_type=PolicyType.Q_LEARNING,
+            checkpoint=args.checkpoint,
+            random_frac=0.0,
+            action_set=DEFAULT_ACTION_SET,
+            lr=0.0,
+            discount=0.999,
+            n_steps=1,
+            verbose=False,
+        ),
     }
     env_config = {
         'action_set': 'default',
@@ -103,13 +114,15 @@ def get_player(checkpoint):
     }
     # return Player(player_config=player_config, env_config=None)
     # return agent_1v1.Player(player_config=player_config, env_config=env_config)
-    return agent_rl_1v1.Player(player_config=player_config, env_config=env_config)
+    # return agent_rl_1v1.Player(player_config=player_config, env_config=env_config)
+    return agent_rl_3v3.Player(player_config=player_config, env_config=env_config)
 
-def main(unused_argv):
+def main():
+    args = parse_args()
     # model = get_inference_model(FLAGS.inference_model)
-    level = {
-        'mini': '1_vs_1_easy',
-    }[FLAGS.track]
+    # level = {
+    #     'mini': '1_vs_1_easy',
+    # }[FLAGS.track]
     # config = Config({
     #     'action_set': FLAGS.action_set,
     #     'dump_full_episodes': True,
@@ -121,14 +134,14 @@ def main(unused_argv):
     #     'pitch_scale': 1.0,
     #     'level': level,
     # })
-    player = get_player(checkpoint=FLAGS.checkpoint)
+    player = get_player(args=args)
     env = football_env.create_remote_environment(
-        FLAGS.username, FLAGS.token, FLAGS.model_name, track=FLAGS.track,
+        username=args.username, token=args.token, model_name=args.model_name, track=args.track,
         # representation='extracted',
         representation='raw',
         stacked=False,
-        include_rendering=FLAGS.render)
-    for _ in range(FLAGS.how_many):
+        include_rendering=args.render)
+    for _ in range(args.how_many):
         obs = env.reset()
         cnt = 1
         done = False
@@ -150,8 +163,8 @@ def main(unused_argv):
             #     print(actions)
             #     actions = player.take_action(observations=obs)
             #     assert len(actions) == 1, actions
-            print(actions)
-            for k, v in sorted(obs[0].items()): print(k, v)
+            # print(actions)
+            # for k, v in sorted(obs[0].items()): print(k, v)
             ACTION_TO_INDEX_MAP = {a:i for i, a in enumerate(DEFAULT_ACTION_SET)}
             actions = [ACTION_TO_INDEX_MAP[a] for a in actions]
             obs, rew, done, _ = env.step(actions)
@@ -164,5 +177,4 @@ def main(unused_argv):
         print('=' * 50)
 
 if __name__ == '__main__':
-    FLAGS = get_flags()
-    app.run(main)
+    main()

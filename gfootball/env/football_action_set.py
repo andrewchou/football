@@ -22,6 +22,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from enum import Enum
+
 from gfootball_engine import e_BackendAction
 import numpy
 from six.moves import range
@@ -164,12 +166,17 @@ DEFAULT_ACTION_SET = tuple([
     action_release_dribble,
 ])
 
+class ActionSetType(Enum):
+    DEFAULT = 'DEFAULT'
+    FULL = 'FULL'
+
 ACTION_SET_DICT = {
     # "full" action set is needed by the play_game script.
     # Don't use it for training models.
-    "full": FULL_ACTION_SET,
-    "default": DEFAULT_ACTION_SET,
+    ActionSetType.FULL: FULL_ACTION_SET,
+    ActionSetType.DEFAULT: DEFAULT_ACTION_SET,
 }
+
 
 reverse_action_mapping = {
     action_long_pass: action_release_long_pass,

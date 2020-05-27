@@ -422,6 +422,10 @@ class BaseRLPlayer(player_base.PlayerBase):
                     thickness=1, font_scale=0.5)
             self.writer.write(frame=frame)
         self._action_history.append(action)
+        if self.verbose:
+            print('DEBUG')
+            for row in debug:
+                print(row)
         return [action]
 
     def reset(self):
