@@ -13,29 +13,29 @@ class Player(BaseRLPlayer):
 
     def _get_hardcoded_action(self, debug):
         """Returns action to perform for the current observations."""
-        active = self._get_own_position()
+        own_position = self._get_own_position()
         # Corner etc. - just pass the ball
         if self._observation['game_mode'] != 0:
-            if self.verbose:
-                debug.append(('Not in the run of play. Mode:', self._observation['game_mode']))
+            debug.append(('Not in the run of play. Mode:', self._observation['game_mode']))
             sticky_actions = self._get_sticky_actions()
             if not sticky_actions[4]:
                 return football_action_set.action_right
-            return football_action_set.action_long_pass
+            return football_action_set.action_short_pass
 
         #
         if self._they_have_the_ball():
-            if self.verbose:
-                debug.append('OTHER_TEAM_HAS_THE_BALL')
-            move_target = self._get_ball_owner_location_target()
-            return self._direction_action(move_target - active)
+            ball_owner_location = self._get_ball_owner_location()
+            debug.append(('OTHER_TEAM_HAS_THE_BALL', ball_owner_location))
+            return self._direction_action(delta=ball_owner_location - own_position)
             # if self._last_action == football_action_set.action_pressure:
             #     return football_action_set.action_sprint
             # self._pressure_enabled = True
             # return football_action_set.action_pressure
         if not self._we_have_the_ball():
-            move_target = self._get_ball_location()
-            return self._direction_action(move_target - active)
+            ball_location = self._get_ball_location()
+            move_action = self._direction_action(ball_location - own_position)
+            debug.append(('FREE BALL:', ball_location))
+            return move_action
 
         # if self._pressure_enabled:
         #     self._pressure_enabled = False
@@ -46,30 +46,32 @@ class Player(BaseRLPlayer):
         GOOD_SPOT_TO_SHOOT_FROM = (target_x, 0)
         distance_from_good_spot_to_shoot_from = np.linalg.norm(
             self._get_ball_location() - GOOD_SPOT_TO_SHOOT_FROM)
-        if self.verbose:
-            debug.append((
-                'distance_from_good_spot_to_shoot_from', distance_from_good_spot_to_shoot_from,
-                self._get_ball_location(), GOOD_SPOT_TO_SHOOT_FROM))
+        debug.append((
+            'distance_from_good_spot_to_shoot_from', distance_from_good_spot_to_shoot_from,
+            self._get_ball_location(), GOOD_SPOT_TO_SHOOT_FROM))
         if distance_from_good_spot_to_shoot_from < self._shoot_distance:
-            if self.verbose:
-                debug.append('SHOOTING')
+            debug.append(('SHOOTING', self._get_ball_location()))
             return football_action_set.action_shot
 
         move_target = GOOD_SPOT_TO_SHOOT_FROM
         # Compute run direction.
 
-        closest_front_opponent = self._closest_front_opponent(o=active, target=move_target)
+        closest_front_opponent = self._closest_front_opponent(o=own_position, target=move_target)
         if closest_front_opponent is not None:
-            dist_front_opp = self._object_distance(active, closest_front_opponent)
+            dist_front_opp = self._object_distance(own_position, closest_front_opponent)
         else:
             dist_front_opp = 2.0
 
         # Maybe avoid opponent on your way?
         if dist_front_opp < 0.08:
-            return self._avoid_opponent(
-                own_position=active, opponent_position=closest_front_opponent, target=move_target)
+            move_action = self._avoid_opponent(
+                own_position=own_position, opponent_position=closest_front_opponent, target=move_target)
+            debug.append(('DRIBBLING OPPONENT:', move_target))
+            return move_action
         else:
-            return self._direction_action(move_target - active)
+            move_action = self._direction_action(delta=move_target - own_position)
+            debug.append(('DRIBBLING IN SPACE:', move_action))
+            return move_action
 
     def get_state(self, observations):
         assert len(observations) == 1, len(observations)

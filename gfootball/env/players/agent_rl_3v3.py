@@ -58,8 +58,9 @@ class Player(BaseRLPlayer):
     def _get_hardcoded_defensive_action(self, debug):
         debug.append('OTHER_TEAM_HAS_THE_BALL')
         if self._am_closest_team_member_to_opponent_with_ball() and (not self._their_gk_has_the_ball()):
-            move_target = self._get_ball_owner_location_target()
-            move_action = self._direction_action(move_target)
+            ball_owner_location = self._get_ball_owner_location()
+            move_target = ball_owner_location - self._get_own_position()
+            move_action = self._direction_action(delta=move_target)
             debug.append(('IM THE CLOSEST DEFENDER', move_target, move_action))
         else:
             move_target = self._get_assigned_opponent_to_defend_target()
@@ -159,7 +160,7 @@ class Player(BaseRLPlayer):
                     pass_player_index=best_pass_player_index, long_pass=best_is_long_pass, debug=debug)
         else:
             # Compute run direction.
-            move_action = self._direction_action(move_target - own_position)
+            move_action = self._direction_action(delta=move_target - own_position)
         return move_action
 
     def _get_teammate_position(self, teammate_index):

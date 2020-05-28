@@ -8,7 +8,7 @@ from gfootball.env.config import Config
 from gfootball.common.args import bool_arg
 from gfootball.common.history import History, HistoryItem
 from gfootball.env import football_env
-from gfootball.env.football_action_set import DEFAULT_ACTION_SET
+from gfootball.env.football_action_set import DEFAULT_ACTION_SET, ActionSetType
 from gfootball.policies.base_policy import PolicyConfig, PolicyType
 
 
@@ -19,7 +19,7 @@ def parse_args():
         '--players', type=str, default='bot_1v1:left_players=1',
         help='Semicolon separated list of players, single keyboard player on the left by default')
     parser.add_argument('--level', type=str, default='1_vs_1_easy', help='Level to play')
-    parser.add_argument('--action_set', type=str, default='default', help='default or full')
+    # parser.add_argument('--action_set', type=str, default='default', help='default or full')
     # parser.add_argument('--real_time', type=bool_arg, default=True,
     #     help='If true, environment will slow down so humans can play.')
     parser.add_argument('--render', type=bool_arg, default=True, help='Whether to do game rendering.')
@@ -42,8 +42,8 @@ def main():
     args = parse_args()
     players = args.players.split(';')
     config = Config({
-        'action_set': args.action_set,
-        'dump_full_episodes': True,
+        'action_set': ActionSetType.DEFAULT,
+        'dump_full_episodes': False,
         'players': players,
         # 'real_time': args.real_time and args.render,
         'real_time': args.render and (not args.video),

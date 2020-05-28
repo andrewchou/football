@@ -1,5 +1,5 @@
 '''Sample bot player.'''
-
+import cv2
 import numpy as np
 import pygame
 
@@ -9,7 +9,7 @@ from gfootball.common.state.angle import relative_angle_bucket
 from gfootball.common.writer import Writer, write_text_on_frame
 from gfootball.env import football_action_set
 from gfootball.env import player_base
-from gfootball.env.football_action_set import DEFAULT_ACTION_SET
+from gfootball.env.football_action_set import DEFAULT_ACTION_SET, ActionSetType
 from gfootball.policies.base_policy import PolicyConfig, PolicyType
 from gfootball.policies.double_expected_sarsa import DoubleExpectedSarsa
 from gfootball.policies.nstep_sarsa import NStepSarsa
@@ -17,9 +17,9 @@ from gfootball.policies.q_learning import QLearning
 from gfootball.scenarios import e_PlayerRole_GK
 
 class BaseRLPlayer(player_base.PlayerBase):
-    def __init__(self, player_config, env_config):
+    def __init__(self, player_config, env_config, testing=False):
         super().__init__(player_config=player_config)
-        assert env_config['action_set'] == 'default'
+        assert env_config['action_set'] == ActionSetType.DEFAULT
         self.pitch_scale = env_config['pitch_scale']
         assert self.pitch_scale in (1.0, 0.5), self.pitch_scale
         self._observation = None
@@ -35,7 +35,8 @@ class BaseRLPlayer(player_base.PlayerBase):
         self._prev_state = None
         self.policy = self.get_policy(player_config=player_config)
 
-        pygame.init()
+        if not testing:
+            pygame.init()
         self._init_done = False
         self.reset()
 
@@ -66,7 +67,7 @@ class BaseRLPlayer(player_base.PlayerBase):
         '''Computes distance between two objects.'''
         return np.linalg.norm(np.array(object1) - np.array(object2))
 
-    def _direction_action(self, delta, adjacent_to_action=None):
+    def _direction_action(self, delta, adjacent_to_action=None, use_max_similarity=True):
         '''For required movement direction vector returns appropriate action.'''
         all_directions = [
             (football_action_set.action_top, (0, -1)),
@@ -90,7 +91,11 @@ class BaseRLPlayer(player_base.PlayerBase):
         all_directions = [
             (a, np.array(v) / np.linalg.norm(np.array(v))) for a, v in all_directions
         ]
-        best_direction = np.argmax([np.dot(delta, v) for a, v in all_directions])
+        dots = [np.dot(delta, v) for a, v in all_directions]
+        if use_max_similarity:
+            best_direction = np.argmax(dots)
+        else:
+            best_direction = np.argmin(dots)
         action = all_directions[best_direction][0]
         # TODO
         # if (self._last_action == action): # or (self._last_action == football_action_set.action_sprint):
@@ -260,12 +265,7 @@ class BaseRLPlayer(player_base.PlayerBase):
         delta_t = target - own_position
         original_action = self._direction_action(delta=delta_t)
         delta = opponent_position - own_position
-        return self._direction_action(delta=delta, adjacent_to_action=original_action)
-        # new_delta = [delta[1], -delta[0]]
-        # if np.dot(delta_t, new_delta) < 0:
-        #     new_delta = [-new_delta[0], -new_delta[1]]
-        #
-        # return self._direction_action(new_delta)
+        return self._direction_action(delta=delta, adjacent_to_action=original_action, use_max_similarity=False)
 
     def _get_ball_location(self):
         return self._observation['ball'][:2]
@@ -287,13 +287,6 @@ class BaseRLPlayer(player_base.PlayerBase):
         other_player_with_ball_velocity = self._get_ball_owner_velocity()
         # print('_is_ball_owner_facing_our_goal', other_player_with_ball_velocity[0] < 0, other_player_with_ball_velocity)
         return other_player_with_ball_velocity[0] < 0
-
-    def _get_ball_owner_location_target(self):
-        target = self._get_ball_owner_location() - self._get_own_position()
-        # if self._is_ball_owner_facing_our_goal():
-        #     other_player_with_ball_velocity = self._get_ball_owner_velocity()
-        #     target += 3 * other_player_with_ball_velocity
-        return target
 
     def _get_own_position(self):
         return self._observation['left_team'][self._get_own_index()]
@@ -392,20 +385,27 @@ class BaseRLPlayer(player_base.PlayerBase):
         #         print(k, v)
         self._observation = observations[0]
         state = self.get_state(observations=observations)
+        # frame should always be in self._observation when render is on, but sometimes the remote server fucks things up.
         if self.writer:
-            frame = self._observation['frame'][:, :, [2, 1, 0]].copy()
-            for i, (k, v) in enumerate(sorted(state._asdict().items())):
-                write_text_on_frame(
-                    frame=frame, text='%s: %s' % (k, v),
-                    color=RED, bottom_left_corner_of_text=(30, 20 * (i + 2)),
-                    thickness=1, font_scale=0.5)
-            for i, (k, v) in enumerate(sorted(self._observation.items())):
-                if k == 'frame':
-                    continue
-                write_text_on_frame(
-                    frame=frame, text='%s: %s' % (k, v),
-                    color=RED, bottom_left_corner_of_text=(360, 20 * (i + 2)),
-                    thickness=1, font_scale=0.5)
+            if ('frame' in self._observation):
+                frame = self._observation['frame'][:, :, [2, 1, 0]].copy()
+                assert frame.shape in ((720, 1280, 3), (450, 800, 3)), frame.shape
+                if frame.shape != (720, 1280, 3):
+                    frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
+                for i, (k, v) in enumerate(sorted(state._asdict().items())):
+                    write_text_on_frame(
+                        frame=frame, text='%s: %s' % (k, v),
+                        color=RED, bottom_left_corner_of_text=(30, 20 * (i + 2)),
+                        thickness=1, font_scale=0.5)
+                for i, (k, v) in enumerate(sorted(self._observation.items())):
+                    if k == 'frame':
+                        continue
+                    write_text_on_frame(
+                        frame=frame, text='%s: %s' % (k, v),
+                        color=RED, bottom_left_corner_of_text=(360, 20 * (i + 2)),
+                        thickness=1, font_scale=0.5)
+            else:
+                frame = None
         if self.verbose:
             print(state)
         debug = []
@@ -415,15 +415,16 @@ class BaseRLPlayer(player_base.PlayerBase):
         else:
             action = self.policy.get_action(state=state, debug=debug)
         if self.writer:
-            for i, x in enumerate(debug):
-                write_text_on_frame(
-                    frame=frame, text=str(x),
-                    color=RED, bottom_left_corner_of_text=(20, 720 - 20 * (len(debug) - i)),
-                    thickness=1, font_scale=0.5)
-            self.writer.write(frame=frame)
+            if frame is not None:
+                for i, x in enumerate(debug):
+                    write_text_on_frame(
+                        frame=frame, text=str(x),
+                        color=RED, bottom_left_corner_of_text=(20, 720 - 20 * (len(debug) - i)),
+                        thickness=1, font_scale=0.5)
+                self.writer.write(frame=frame)
         self._action_history.append(action)
         if self.verbose:
-            print('DEBUG')
+            print('DEBUG', self._warmstart, debug)
             for row in debug:
                 print(row)
         return [action]

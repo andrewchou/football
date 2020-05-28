@@ -49,6 +49,7 @@ def parse_args():
     parser.add_argument('--checkpoint', type=str, default=None,
         help='A path to an checkpoint saved by run_ppo2.py. Empty for random actions')
     parser.add_argument('--action_set', type=ActionSetType, default=ActionSetType.DEFAULT, help='Action set')
+    parser.add_argument('--video', type=str, default='', help='')
     parser.add_argument('--verbose', type=bool_arg, default=False)
     return parser.parse_args()
 
@@ -91,9 +92,9 @@ def get_player(args):
         'left_players': 1,
         'right_players': 0,
         'checkpoint': args.checkpoint,
-        'warmstart': bool(args.checkpoint),
+        'warmstart': not args.checkpoint,
         'verbose': args.verbose,
-        'video': None,
+        'video': args.video,
         'policy_config': PolicyConfig(
             policy_type=PolicyType.Q_LEARNING,
             checkpoint=args.checkpoint,
@@ -114,8 +115,10 @@ def get_player(args):
     }
     # return Player(player_config=player_config, env_config=None)
     # return agent_1v1.Player(player_config=player_config, env_config=env_config)
-    # return agent_rl_1v1.Player(player_config=player_config, env_config=env_config)
-    return agent_rl_3v3.Player(player_config=player_config, env_config=env_config)
+    if args.track == 'mini':
+        return agent_rl_1v1.Player(player_config=player_config, env_config=env_config)
+    else:
+        return agent_rl_3v3.Player(player_config=player_config, env_config=env_config)
 
 def main():
     args = parse_args()
@@ -157,6 +160,7 @@ def main():
             #     config=config,
             # )
             # a = self._action_to_list(player.take_action(adopted_obs))
+            for k, v in sorted(obs[0].items()): print(k, v)
             actions = player.take_action(observations=obs)
             assert len(actions) == 1, actions
             # while int(actions[0]._backend_action) >= NUM_ACTIONS:
@@ -164,7 +168,6 @@ def main():
             #     actions = player.take_action(observations=obs)
             #     assert len(actions) == 1, actions
             # print(actions)
-            # for k, v in sorted(obs[0].items()): print(k, v)
             ACTION_TO_INDEX_MAP = {a:i for i, a in enumerate(DEFAULT_ACTION_SET)}
             actions = [ACTION_TO_INDEX_MAP[a] for a in actions]
             obs, rew, done, _ = env.step(actions)

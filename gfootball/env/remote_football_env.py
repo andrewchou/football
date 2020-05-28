@@ -97,7 +97,16 @@ class RemoteFootballEnv(gym.Env):
             game_version=config.game_version, game_id=self._game_id,
             username=self._username, token=self._token, action=-1,
             model_name=self._model_name, action_list=action)
-        return self._get_env_result(request, 'Step')
+        result = self._get_env_result(request, 'Step')
+        assert isinstance(result[-1], dict), result
+        if 'frame' in result[-1]:
+            frame = result[-1].pop('frame')
+            for obs in result[0]:
+                assert 'frame' not in obs, result
+                assert isinstance(obs, dict), obs
+                obs['frame'] = frame
+        # assert 0, result
+        return result
 
     def reset(self):
         if self._channel is not None:
@@ -118,7 +127,10 @@ class RemoteFootballEnv(gym.Env):
         get_env_result_request = game_server_pb2.GetEnvResultRequest(
             game_version=config.game_version, game_id=self._game_id,
             username=self._username, token=self._token, model_name=self._model_name)
-        return self._get_env_result(get_env_result_request, 'GetEnvResult')[0]
+        obs = self._get_env_result(get_env_result_request, 'GetEnvResult')
+        assert 'frame' not in obs[-1], obs
+        # assert 0, obs
+        return obs[0]
 
     def _reset_with_retries(self, request):
         time_to_sleep = 1
