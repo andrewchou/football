@@ -107,7 +107,7 @@ def get_player(args):
         ),
     }
     env_config = {
-        'action_set': 'default',
+        'action_set': ActionSetType.DEFAULT,
         'pitch_scale': 1.0,
         'warmstart': False,
         'random_frac': 0.0,
