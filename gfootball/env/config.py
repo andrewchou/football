@@ -19,6 +19,8 @@ import copy
 
 import gfootball_engine as libgame
 
+from gfootball.env.football_action_set import ActionSetType
+
 def parse_player_definition(definition):
     """Parses player definition.
 
@@ -66,7 +68,7 @@ class Config(object):
     def __init__(self, values=None):
         self._game_config = libgame.GameConfig()
         self._values = {
-            'action_set': 'default',
+            'action_set': ActionSetType.DEFAULT,
             'custom_display_stats': None,
             'display_game_stats': True,
             'dump_full_episodes': False,
