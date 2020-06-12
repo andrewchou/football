@@ -14,10 +14,6 @@
 
 """GFootball Environment."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from gfootball.env import config
 from gfootball.env import football_env
 from gfootball.env import observation_preprocessing
@@ -192,6 +188,7 @@ def create_environment(env_name='',
         'write_video': write_video,
     }
     config_values.update(other_config_options)
+    # assert 0, config_values
     c = config.Config(config_values)
     env = football_env.FootballEnv(c)
     if render:

@@ -69,19 +69,21 @@ def generate_smm(observation, config=None,
       (N, H, W, C) - shaped np array representing SMM. N stands for the number of
       players we are controlling.
     """
+    assert isinstance(observation, (list, tuple)), observation
     frame = np.zeros((len(observation), channel_dimensions[1],
     channel_dimensions[0], len(get_smm_layers(config))),
         dtype=np.uint8)
 
     for o_i, o in enumerate(observation):
+        assert isinstance(o, dict), o
         for index, layer in enumerate(get_smm_layers(config)):
             if layer not in o:
                 continue
             if layer == 'active':
                 if o[layer] == -1:
                     continue
-                print(frame.shape, o_i, index)
-                print(np.array(o['left_team'][o[layer]]))
+                # print(frame.shape, o_i, index)
+                # print(np.array(o['left_team'][o[layer]]))
                 mark_points(
                     frame=frame[o_i, :, :, index],
                     points=np.array(o['left_team'][o[layer]]).reshape(-1))

@@ -74,11 +74,13 @@ class FootballEnv(gym.Env):
         return gym.spaces.Discrete(self._num_actions)
 
     def _construct_players(self, definitions, base_player_config):
+        # assert 0, definitions
         result = []
         left_position = 0
         right_position = 0
         for definition in definitions:
             (name, d) = cfg.parse_player_definition(definition)
+            # assert 0, (name, d)
             config_name = 'player_{}'.format(name)
             if config_name in base_player_config:
                 base_player_config[config_name] += 1
@@ -93,8 +95,9 @@ class FootballEnv(gym.Env):
             if ('checkpoint' in player_config) and (player_config['checkpoint'] is not None):
                 player_config['checkpoint'] = expanduser(player_config['checkpoint'])
             player = player_class(player_config=player_config, env_config=self._config)
-            if name.startswith('agent_'):
+            if name.startswith('agent'):
                 assert not self._agent, 'Only one \'agent\' player allowed'
+                assert player is not None
                 self._agent = player
                 self._agent_index = len(result)
                 self._agent_left_position = left_position
@@ -103,6 +106,7 @@ class FootballEnv(gym.Env):
             left_position += player.num_controlled_left_players()
             right_position += player.num_controlled_right_players()
             base_player_config['index'] += 1
+        assert self._agent is not None
         return result
 
     def _convert_observations(
@@ -206,15 +210,16 @@ class FootballEnv(gym.Env):
         actions = left_actions + right_actions
         return actions, agent_obs
 
-    def step(self):
-        # action = self._action_to_list(action)
-        # if self._agent:
-        #     self._agent.set_action(action)
-        # else:
-        #     assert len(
-        #         action
-        #     ) == 0, 'step() received {} actions, but no agent is playing.'.format(
-        #         len(action))
+    def step(self, action=None):
+        if action is not None:
+            action = self._action_to_list(action)
+            if self._agent:
+                self._agent.set_action(action)
+            else:
+                assert len(
+                    action
+                ) == 0, 'step() received {} actions, but no agent is playing.'.format(
+                    len(action))
 
         actions, agent_obs = self._get_actions()
         _, reward, done, info = self._env.step(actions)
@@ -234,6 +239,7 @@ class FootballEnv(gym.Env):
         if self._agent is not None:
             info['agent_action'] = actions[self._agent_index]
             info['agent_obs'] = actions[self._agent_index]
+        assert isinstance(info, dict), info
         return (self.observation(), np.array(reward, dtype=np.float32), done, info)
 
     def reset(self):
@@ -246,10 +252,12 @@ class FootballEnv(gym.Env):
     def observation(self):
         if not self._cached_observation:
             self._cached_observation = self._env.observation()
+            assert isinstance(self._cached_observation, dict), self._cached_observation
             if self._agent:
                 self._cached_observation = self._convert_observations(
                     self._cached_observation, self._agent,
                     self._agent_left_position, self._agent_right_position)
+        assert isinstance(self._cached_observation, list), self._cached_observation
         return self._cached_observation
 
     def write_dump(self, name):

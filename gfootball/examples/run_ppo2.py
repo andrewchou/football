@@ -24,7 +24,8 @@ from absl import app
 from absl import flags
 from baselines import logger
 from baselines.bench import monitor
-from baselines.common.vec_env import SubprocVecEnv
+# from baselines.common.vec_env import SubprocVecEnv
+from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from baselines.ppo2 import ppo2
 
 import gfootball.env as football_env
@@ -84,8 +85,10 @@ def create_single_football_env(iprocess):
         dump_frequency=50 if FLAGS.render and iprocess == 0 else 0,
         pitch_scale=FLAGS.pitch_scale,
     )
-    env = monitor.Monitor(env, logger.get_dir() and os.path.join(logger.get_dir(),
-        str(iprocess)))
+    env = monitor.Monitor(
+        env=env,
+        filename=logger.get_dir() and os.path.join(logger.get_dir(), str(iprocess)),
+    )
     return env
 
 def train(_):
