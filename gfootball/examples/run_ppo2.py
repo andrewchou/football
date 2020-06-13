@@ -26,9 +26,9 @@ from baselines import logger
 from baselines.bench import monitor
 # from baselines.common.vec_env import SubprocVecEnv
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
-from baselines.ppo2 import ppo2
 
 import gfootball.env as football_env
+from gfootball.thirdparty.baselines import ppo2
 
 def get_flags():
     FLAGS = flags.FLAGS
@@ -94,14 +94,14 @@ def create_single_football_env(iprocess):
 def train(_):
     """Trains a PPO2 policy."""
     assert FLAGS.num_envs > 0, FLAGS.num_envs
-    if FLAGS.num_envs == 1:
-        vec_env = create_single_football_env(0)
-        vec_env.num_envs = 1
-    else:
-        vec_env = SubprocVecEnv([
-            (lambda _i=i: create_single_football_env(_i))
-            for i in range(FLAGS.num_envs)
-        ], context=None)
+    # if FLAGS.num_envs == 1:
+    #     vec_env = create_single_football_env(0)
+    #     vec_env.num_envs = 1
+    # else:
+    vec_env = SubprocVecEnv([
+        (lambda _i=i: create_single_football_env(_i))
+        for i in range(FLAGS.num_envs)
+    ], context=None)
 
     # Import tensorflow after we create environments. TF is not fork sake, and
     # we could be using TF as part of environment if one of the players is
@@ -116,7 +116,8 @@ def train(_):
     print('Logging to:', logger.get_dir())
     tf.Session(config=config).__enter__()
 
-    ppo2.learn(network=FLAGS.policy,
+    ppo2.learn(
+        network=FLAGS.policy,
         total_timesteps=FLAGS.num_timesteps,
         env=vec_env,
         seed=FLAGS.seed,
